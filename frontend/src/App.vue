@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
+import VoiceOrbCanvas from '@/components/voice/VoiceOrbCanvas.vue'
 import { useCalendar } from '@/composables/useCalendar'
 
 const {
@@ -58,10 +59,10 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     </main>
 
     <div class="voice-center">
-      <div class="voice-placeholder">
-        <div class="voice-ring" />
-        <div class="voice-dot" />
-      </div>
+      <VoiceOrbCanvas
+        status="idle"
+        :size="100"
+      />
     </div>
 
     <footer class="bottom-toolbar">
@@ -175,37 +176,16 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
 .voice-center {
   position: absolute;
-  bottom: 80px;
+  bottom: 72px;
   left: 50%;
   transform: translateX(-50%);
   z-index: $z-overlay;
-}
-
-.voice-placeholder {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 80px;
-  height: 80px;
 }
 
-.voice-ring {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 2px solid rgba($color-primary, 0.3);
-  animation: voice-ring-pulse 2s ease-out infinite;
-}
 
-.voice-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle, $color-primary-light, $color-primary);
-  box-shadow: 0 0 20px rgba($color-primary, 0.5);
-}
 
 .bottom-toolbar {
   height: $calendar-bottom-toolbar-height;
@@ -239,8 +219,5 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   50% { transform: translate(-20px, -50px) scale(1.15); opacity: 0.2; }
 }
 
-@keyframes voice-ring-pulse {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
+
 </style>
