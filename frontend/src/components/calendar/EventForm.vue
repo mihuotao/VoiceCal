@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import { motion } from 'motion-v'
-import { springPresets } from '@/composables/useMotion'
 import GlassInput from '@/components/glass/GlassInput.vue'
 import GlassButton from '@/components/glass/GlassButton.vue'
 import type { CalendarEvent } from '@/types/event'
@@ -47,8 +46,71 @@ const form = reactive<FormState>({
 
 const isEditing = ref(false)
 
+// Drag state
+const pos = reactive({ x: 0, y: 0 })
+const size = reactive({ w: 480, h: 0 })
+const isDragging = ref(false)
+const isResizing = ref(false)
+const isPositioned = ref(false)
+let dragStartX = 0
+let dragStartY = 0
+let dragStartPosX = 0
+let dragStartPosY = 0
+let resizeStartX = 0
+let resizeStartY = 0
+let resizeStartW = 0
+let resizeStartH = 0
+
+function centerForm() {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  pos.x = Math.max(0, (vw - size.w) / 2)
+  pos.y = Math.max(0, (vh - vh * 0.85) / 2)
+  isPositioned.value = true
+}
+
+function onDragStart(e: MouseEvent) {
+  if ((e.target as HTMLElement).closest('.event-form__close')) return
+  isDragging.value = true
+  dragStartX = e.clientX
+  dragStartY = e.clientY
+  dragStartPosX = pos.x
+  dragStartPosY = pos.y
+  e.preventDefault()
+}
+
+function onDragMove(e: MouseEvent) {
+  if (isDragging.value) {
+    pos.x = dragStartPosX + (e.clientX - dragStartX)
+    pos.y = dragStartPosY + (e.clientY - dragStartY)
+  }
+  if (isResizing.value) {
+    size.w = Math.max(380, resizeStartW + (e.clientX - resizeStartX))
+    size.h = Math.max(300, resizeStartH + (e.clientY - resizeStartY))
+  }
+}
+
+function onDragEnd() {
+  isDragging.value = false
+  isResizing.value = false
+}
+
+function onResizeStart(e: MouseEvent) {
+  isResizing.value = true
+  resizeStartX = e.clientX
+  resizeStartY = e.clientY
+  resizeStartW = size.w
+  resizeStartH = size.h
+  e.preventDefault()
+  e.stopPropagation()
+}
+
 watch(() => props.open, (opened) => {
   if (!opened) return
+  isPositioned.value = false
+  size.h = 0
+  centerForm()
+
   if (props.event) {
     isEditing.value = true
     const s = new Date(props.event.startTime)
@@ -95,17 +157,24 @@ function handleDelete() {
       :animate="{ opacity: 1 }"
       :exit="{ opacity: 0 }"
       :transition="{ duration: 0.15 }"
-      @click="emit('close')"
+      @mousemove="onDragMove"
+      @mouseup="onDragEnd"
     >
-      <motion.div
+      <div
         class="event-form"
-        :initial="{ opacity: 0, scale: 0.92, y: 20 }"
-        :animate="{ opacity: 1, scale: 1, y: 0 }"
-        :exit="{ opacity: 0, scale: 0.92, y: 20 }"
-        :transition="springPresets.modal"
+        :class="{
+          'event-form--dragging': isDragging || isResizing,
+          'event-form--positioned': isPositioned
+        }"
+        :style="{
+          left: pos.x + 'px',
+          top: pos.y + 'px',
+          width: size.w + 'px',
+          maxHeight: size.h > 0 ? size.h + 'px' : '85vh'
+        }"
         @click.stop
       >
-        <div class="event-form__header">
+        <div class="event-form__header" @mousedown="onDragStart">
           <h2>{{ isEditing ? '编辑日程' : '新建日程' }}</h2>
           <button class="event-form__close" @click="emit('close')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -199,7 +268,13 @@ function handleDelete() {
             </GlassButton>
           </div>
         </div>
-      </motion.div>
+
+        <div class="event-form__resize-handle" @mousedown="onResizeStart">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M10 2L2 10M10 6L6 10M10 10L10 10" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
     </motion.div>
   </Teleport>
 </template>
@@ -211,25 +286,30 @@ function handleDelete() {
   position: fixed;
   inset: 0;
   z-index: $z-modal;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  padding: $space-4;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0;
 }
 
 .event-form {
-  width: 100%;
-  max-width: 480px;
-  max-height: 85vh;
+  position: absolute;
   overflow-y: auto;
-  background: rgba(20, 18, 40, 0.85);
+  background: rgba(20, 18, 40, 0.92);
   backdrop-filter: blur(32px) saturate(1.4);
   -webkit-backdrop-filter: blur(32px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: $radius-xl;
   box-shadow: $shadow-lg;
+  transition: box-shadow $transition-fast;
+
+  &--positioned {
+    transition: none;
+  }
+
+  &--dragging {
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    cursor: move;
+    user-select: none;
+  }
 
   &__header {
     display: flex;
@@ -237,9 +317,14 @@ function handleDelete() {
     justify-content: space-between;
     padding: $space-5 $space-6;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
 
     h2 {
-      font-size: $font-size-lg;
+      font-size: $font-size-xl;
       font-weight: $font-weight-semibold;
     }
   }
@@ -282,7 +367,7 @@ function handleDelete() {
     gap: $space-1;
 
     label {
-      font-size: $font-size-xs;
+      font-size: $font-size-sm;
       color: $color-text-tertiary;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -294,7 +379,7 @@ function handleDelete() {
     align-items: center;
     gap: $space-2;
     cursor: pointer;
-    font-size: $font-size-sm;
+    font-size: $font-size-base;
     color: $color-text-secondary;
     text-transform: none;
     letter-spacing: normal;
@@ -313,9 +398,9 @@ function handleDelete() {
   }
 
   &__category {
-    padding: $space-1 $space-3;
+    padding: $space-2 $space-4;
     border-radius: $radius-full;
-    font-size: $font-size-xs;
+    font-size: $font-size-sm;
     font-family: $font-family;
     font-weight: $font-weight-medium;
     cursor: pointer;
@@ -371,6 +456,24 @@ function handleDelete() {
   &__footer-right {
     display: flex;
     gap: $space-2;
+  }
+
+  &__resize-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: nwse-resize;
+    border-radius: $radius-xl 0 $radius-xl 0;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
   }
 }
 </style>
