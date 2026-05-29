@@ -78,6 +78,7 @@ const { speak } = useTts()
 const settingsOpen = ref(false)
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+const todayWeekday = new Date().getDay()
 
 const toolbarActiveId = ref('month')
 const searchOpen = ref(false)
@@ -266,7 +267,12 @@ function handleVoiceConfirm() {
     <main class="calendar-body">
       <div class="calendar-left">
         <div class="weekday-row">
-          <div v-for="w in weekdays" :key="w" class="weekday-cell">
+          <div
+            v-for="(w, i) in weekdays"
+            :key="w"
+            class="weekday-cell"
+            :class="{ 'weekday-cell--today': i === todayWeekday }"
+          >
             {{ w }}
           </div>
         </div>
@@ -464,18 +470,29 @@ function handleVoiceConfirm() {
 .weekday-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: $space-2 0;
+  padding: $space-2 $space-1;
   margin-bottom: $space-1;
+  background: linear-gradient(135deg, #1a1a3e, #2d2b6b);
+  border-radius: $radius-md;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .weekday-cell {
   text-align: center;
   font-size: $font-size-base;
   font-weight: $font-weight-bold;
-  color: $color-text-tertiary;
-  letter-spacing: 0.05em;
+  color: #c7d2fe;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: $space-1 0;
+  padding: $space-2 0;
+  border-radius: $radius-sm;
+  transition: background $transition-fast, color $transition-fast;
+
+  &--today {
+    color: white;
+    background: rgba($color-primary, 0.3);
+    font-weight: $font-weight-bold;
+  }
 }
 
 .voice-center {
