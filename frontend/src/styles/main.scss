@@ -56,6 +56,20 @@ body {
   color: white;
 }
 
-@view-transition {
-  navigation: auto;
+::view-transition-old(month-label) {
+  animation: vt-month-exit 0.3s ease-in both;
+}
+
+::view-transition-new(month-label) {
+  animation: vt-month-enter 0.3s ease-out both;
+}
+
+@keyframes vt-month-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-12px) scale(0.95); }
+}
+
+@keyframes vt-month-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
