@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.voicecal.mapper.ReminderMapper">
+
+    <select id="selectPendingBefore" resultType="com.voicecal.entity.Reminder">
+        SELECT * FROM reminder
+        WHERE status = 'pending'
+          AND is_sent = 0
+          AND remind_at &lt;= #{before}
+        ORDER BY remind_at ASC
+    </select>
+
+</mapper>
