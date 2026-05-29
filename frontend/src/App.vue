@@ -8,12 +8,15 @@ import EventList from '@/components/calendar/EventList.vue'
 import EventForm from '@/components/calendar/EventForm.vue'
 import EventDetail from '@/components/calendar/EventDetail.vue'
 import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
+import SearchPanel from '@/components/search/SearchPanel.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import { useCalendar } from '@/composables/useCalendar'
 import { useVoice } from '@/composables/useVoice'
 import { useEvents } from '@/composables/useEvents'
+import { useSearch } from '@/composables/useSearch'
 import type { CalendarEvent } from '@/types/event'
+import type { SearchResultItem } from '@/types/search'
 
 const {
   monthYearLabel,
@@ -51,9 +54,18 @@ const {
   checkConflicts
 } = useEvents()
 
+const s = useSearch()
+const searchResults = s.results
+const searchSummary = s.summary
+const searchQueryText = s.searchQuery
+const isSearching = s.isSearching
+const search = s.search
+const clearSearch = s.clearSearch
+
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
 const toolbarActiveId = ref('month')
+const searchOpen = ref(false)
 const noteDateKey = shallowRef('')
 const noteText = ref('')
 const noteOpen = ref(false)
@@ -72,6 +84,9 @@ onMounted(() => {
 
 function onToolbarSelect(id: string) {
   toolbarActiveId.value = id
+  if (id === 'search') {
+    searchOpen.value = true
+  }
 }
 
 function onCellDblclick(dateKey: string) {
@@ -173,6 +188,23 @@ function onSelectEvent(ev: CalendarEvent) {
   selectedEvent.value = ev
   eventDetailOpen.value = true
 }
+
+function handleSearch(query: string) {
+  if (!query.trim()) return
+  search(query)
+}
+
+function handleSearchCreateEvent(_item: SearchResultItem) {
+  editingEvent.value = null
+  formInitialDate.value = selectedDate.value
+  eventFormOpen.value = true
+  searchOpen.value = false
+}
+
+function handleCloseSearch() {
+  searchOpen.value = false
+  clearSearch()
+}
 </script>
 
 <template>
@@ -231,6 +263,17 @@ function onSelectEvent(ev: CalendarEvent) {
         @click="openOverlay"
       />
     </div>
+
+    <SearchPanel
+      :open="searchOpen"
+      :query="searchQueryText"
+      :results="searchResults"
+      :summary="searchSummary"
+      :is-searching="isSearching"
+      @close="handleCloseSearch"
+      @search="handleSearch"
+      @create-event="handleSearchCreateEvent"
+    />
 
     <VoiceOverlay
       :open="isOverlayOpen"
