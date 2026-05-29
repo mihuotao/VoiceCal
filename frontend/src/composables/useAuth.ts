@@ -1,10 +1,10 @@
 import { ref, computed } from 'vue'
-import axios from 'axios'
+import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 import type { LoginRequest, RegisterRequest, LoginUserVO, User, AuthState } from '@/types/auth'
 
 const AUTH_KEY = 'voicecal_token'
 const USER_KEY = 'voicecal_user'
-const API_BASE = '/api/v1/auth'
 
 const state = ref<AuthState>({
   user: null,
@@ -23,18 +23,9 @@ function loadFromStorage() {
       state.value.token = token
       state.value.user = user
       state.value.isAuthenticated = true
-      setAuthHeader(token)
     } catch {
       clearAuth()
     }
-  }
-}
-
-function setAuthHeader(token: string | null) {
-  if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-  } else {
-    delete axios.defaults.headers.common['Authorization']
   }
 }
 
@@ -45,7 +36,6 @@ function saveAuth(token: string, user: User) {
   state.value.user = user
   state.value.isAuthenticated = true
   state.value.error = null
-  setAuthHeader(token)
 }
 
 function clearAuth() {
@@ -55,18 +45,7 @@ function clearAuth() {
   state.value.user = null
   state.value.isAuthenticated = false
   state.value.error = null
-  setAuthHeader(null)
 }
-
-axios.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401 && state.value.isAuthenticated) {
-      clearAuth()
-    }
-    return Promise.reject(error)
-  }
-)
 
 loadFromStorage()
 
@@ -75,12 +54,12 @@ export function useAuth() {
     state.value.loading = true
     state.value.error = null
     try {
-      const res = await axios.post<{ code: number; message: string; data: LoginUserVO }>(`${API_BASE}/login`, req)
-      if (res.data.code !== 0 && res.data.code !== 200) {
-        state.value.error = res.data.message || '登录失败'
+      const res = await request.post<ApiResponse<LoginUserVO>>('/auth/login', req)
+      if (res.code !== 200) {
+        state.value.error = res.message || '登录失败'
         return false
       }
-      const vo = res.data.data
+      const vo = res.data
       const user: User = {
         id: vo.userId,
         username: vo.username,
@@ -100,12 +79,12 @@ export function useAuth() {
     state.value.loading = true
     state.value.error = null
     try {
-      const res = await axios.post<{ code: number; message: string; data: LoginUserVO }>(`${API_BASE}/register`, req)
-      if (res.data.code !== 0 && res.data.code !== 201 && res.data.code !== 200) {
-        state.value.error = res.data.message || '注册失败'
+      const res = await request.post<ApiResponse<LoginUserVO>>('/auth/register', req)
+      if (res.code !== 200 && res.code !== 201) {
+        state.value.error = res.message || '注册失败'
         return false
       }
-      const vo = res.data.data
+      const vo = res.data
       const user: User = {
         id: vo.userId,
         username: vo.username,
@@ -123,7 +102,7 @@ export function useAuth() {
 
   async function logout() {
     try {
-      await axios.post(`${API_BASE}/logout`, { token: state.value.token })
+      await request.post('/auth/logout', { token: state.value.token })
     } catch {
       // ignore network errors on logout
     }

@@ -1,8 +1,9 @@
 import { ref, computed } from 'vue'
-import axios from 'axios'
+import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 import type { CalendarEvent, EventCreateRequest } from '@/types/event'
 
-const API_BASE = '/api/events'
+const API_BASE = '/events'
 
 let nextId = 1
 
@@ -34,7 +35,7 @@ export function useEvents() {
       const params: Record<string, string> = {}
       if (start) params.start = start
       if (end) params.end = end
-      const res = await axios.get<CalendarEvent[]>(API_BASE, { params })
+      const res = await request.get<ApiResponse<CalendarEvent[]>>(API_BASE, { params })
       events.value = res.data
     } catch {
       if (events.value.length === 0) {
@@ -47,7 +48,7 @@ export function useEvents() {
 
   async function createEvent(req: EventCreateRequest): Promise<CalendarEvent | null> {
     try {
-      const res = await axios.post<CalendarEvent>(API_BASE, req)
+      const res = await request.post<ApiResponse<CalendarEvent>>(API_BASE, req)
       events.value.push(res.data)
       return res.data
     } catch {
@@ -71,7 +72,7 @@ export function useEvents() {
 
   async function updateEvent(id: number, req: Partial<EventCreateRequest>): Promise<boolean> {
     try {
-      await axios.put(`${API_BASE}/${id}`, req)
+      await request.put(`${API_BASE}/${id}`, req)
       const idx = events.value.findIndex(e => e.id === id)
       if (idx >= 0) Object.assign(events.value[idx], req)
       return true
@@ -84,7 +85,7 @@ export function useEvents() {
 
   async function deleteEvent(id: number): Promise<boolean> {
     try {
-      await axios.delete(`${API_BASE}/${id}`)
+      await request.delete(`${API_BASE}/${id}`)
       events.value = events.value.filter(e => e.id !== id)
       return true
     } catch {

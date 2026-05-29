@@ -1,11 +1,11 @@
 import { ref } from 'vue'
-import axios from 'axios'
+import request from '@/utils/request'
 import { useAuth } from '@/composables/useAuth'
 import { useThemeStore } from '@/stores/theme'
+import type { ApiResponse } from '@/types/api'
 import type { UserPreference, UpdatePreferenceRequest } from '@/types/preference'
 
 const PREF_KEY = 'voicecal_preferences'
-const API_BASE = '/api/v1/preferences'
 
 export interface PreferenceState {
   defaultView: string
@@ -67,9 +67,9 @@ async function fetchPreferences() {
 
   loading.value = true
   try {
-    const res = await axios.get<{ code: number; data: UserPreference }>(API_BASE)
-    if (res.data.code === 0 || res.data.code === 200) {
-      const p = res.data.data
+    const res = await request.get<ApiResponse<UserPreference>>('/preferences')
+    if (res.code === 200) {
+      const p = res.data
       if (p.defaultView) prefs.value.defaultView = p.defaultView
       if (p.defaultCategory) prefs.value.defaultCategory = p.defaultCategory
       if (p.defaultReminder !== undefined) prefs.value.defaultReminder = p.defaultReminder
@@ -114,7 +114,7 @@ async function updatePreferences(update: UpdatePreferenceRequest) {
 
   if (isAuthenticated.value) {
     try {
-      await axios.patch(API_BASE, update)
+      await request.patch('/preferences', update)
     } catch {
       // silently fail - local changes are already saved
     }
