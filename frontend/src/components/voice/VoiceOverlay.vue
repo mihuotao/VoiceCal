@@ -198,8 +198,8 @@ function handleClose() {
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(32px) saturate(1.3);
-  -webkit-backdrop-filter: blur(32px) saturate(1.3);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: $radius-xl $radius-xl 0 0;
   padding: $space-6 $space-6 $space-8;

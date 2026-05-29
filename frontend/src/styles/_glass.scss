@@ -1,31 +1,31 @@
 @use 'variables' as *;
 
-@mixin glass-base($blur: $glass-default-blur, $opacity: $glass-default-opacity, $saturate: $glass-default-saturate) {
-  background: rgba(255, 255, 255, $opacity * 0.1);
-  backdrop-filter: blur($blur) saturate($saturate);
-  -webkit-backdrop-filter: blur($blur) saturate($saturate);
+@mixin glass-base($saturate: $glass-default-saturate) {
+  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 0.1));
+  backdrop-filter: blur(var(--glass-blur)) saturate($saturate);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate($saturate);
   border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity);
 }
 
-@mixin glass-surface($blur: $glass-default-blur, $opacity: $glass-default-opacity) {
-  background: rgba(255, 255, 255, $opacity * 0.12);
-  backdrop-filter: blur($blur);
-  -webkit-backdrop-filter: blur($blur);
+@mixin glass-surface {
+  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 0.12));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity);
 }
 
-@mixin glass-raised($blur: $glass-default-blur, $opacity: $glass-default-opacity) {
-  background: rgba(255, 255, 255, $opacity * 0.18);
-  backdrop-filter: blur($blur);
-  -webkit-backdrop-filter: blur($blur);
+@mixin glass-raised {
+  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 0.18));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity * 1.5);
   box-shadow: $shadow-md;
 }
 
-@mixin glass-strong($blur: $glass-default-blur, $opacity: 0.85) {
-  background: rgba(255, 255, 255, $opacity * 0.22);
-  backdrop-filter: blur($blur) saturate(1.6);
-  -webkit-backdrop-filter: blur($blur) saturate(1.6);
+@mixin glass-strong {
+  background: rgba(255, 255, 255, calc(var(--glass-opacity) * 0.22));
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
   border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity * 2);
   box-shadow: $shadow-lg;
 }

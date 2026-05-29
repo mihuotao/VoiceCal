@@ -240,19 +240,6 @@ function handleDelete() {
             </div>
           </div>
 
-          <div class="event-form__field">
-            <label>颜色</label>
-            <div class="event-form__colors">
-              <button
-                v-for="c in ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6', '#8b5cf6', '#14b8a6']"
-                :key="c"
-                class="event-form__color"
-                :class="{ 'event-form__color--active': form.color === c }"
-                :style="{ background: c }"
-                @click="form.color = c"
-              />
-            </div>
-          </div>
         </div>
 
         <div class="event-form__footer">
@@ -294,8 +281,8 @@ function handleDelete() {
   position: absolute;
   overflow-y: auto;
   background: rgba(20, 18, 40, 0.92);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: $radius-xl;
   box-shadow: $shadow-lg;
@@ -417,30 +404,6 @@ function handleDelete() {
       background: rgba(var(--cat-color), 0.2);
       border-color: var(--cat-color);
       color: var(--cat-color);
-    }
-  }
-
-  &__colors {
-    display: flex;
-    gap: $space-2;
-    flex-wrap: wrap;
-  }
-
-  &__color {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: border-color $transition-fast, transform $transition-fast;
-
-    &:hover {
-      transform: scale(1.15);
-    }
-
-    &--active {
-      border-color: white;
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
     }
   }
 

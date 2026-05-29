@@ -2,10 +2,10 @@
 import { ref, shallowRef, onMounted, watch } from 'vue'
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
 import CalendarGrid from '@/components/calendar/CalendarGrid.vue'
-import BottomToolbar from '@/components/calendar/BottomToolbar.vue'
+import CalendarInfoBar from '@/components/calendar/CalendarInfoBar.vue'
+import StarryBackground from '@/components/calendar/StarryBackground.vue'
 import InlineToolbar from '@/components/calendar/InlineToolbar.vue'
 import InlineNote from '@/components/calendar/InlineNote.vue'
-import EventList from '@/components/calendar/EventList.vue'
 import EventForm from '@/components/calendar/EventForm.vue'
 import EventDetail from '@/components/calendar/EventDetail.vue'
 import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
@@ -114,6 +114,8 @@ function onToolbarSelect(id: string) {
     settingsOpen.value = !settingsOpen.value
   } else if (id === 'profile') {
     logout()
+  } else if (id === 'new') {
+    openNewEvent(selectedDate.value)
   }
 }
 
@@ -234,6 +236,25 @@ function handleCloseSearch() {
   clearSearch()
 }
 
+const weekdayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+function getWeekdayLabel(dateKey: string) {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return weekdayLabels[new Date(y, m - 1, d).getDay()]
+}
+
+function formatDateFull(dateKey: string) {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return `${y}年${m}月${d}日`
+}
+
+function formatEventTime(ev: CalendarEvent) {
+  if (ev.allDay) return '全天'
+  const s = new Date(ev.startTime)
+  const e = new Date(ev.endTime)
+  return `${s.getHours().toString().padStart(2, '0')}:${s.getMinutes().toString().padStart(2, '0')} - ${e.getHours().toString().padStart(2, '0')}:${e.getMinutes().toString().padStart(2, '0')}`
+}
+
 function handleVoiceConfirm() {
   closeOverlay()
   const intent = parsedIntent.value
@@ -247,25 +268,26 @@ function handleVoiceConfirm() {
   <LoginPage v-if="!isAuthenticated" />
 
   <div v-else class="app-shell">
-    <div class="bg-orbs">
-      <div class="bg-orb bg-orb--1" />
-      <div class="bg-orb bg-orb--2" />
-      <div class="bg-orb bg-orb--3" />
-    </div>
-
-    <CalendarHeader
-      :month-year-label="monthYearLabel"
-      :year-label="yearLabel"
-      :today-label="todayLabel"
-      :is-current-month="isCurrentMonth"
-      :is-transitioning="isTransitioning"
-      @prev-month="prevMonth"
-      @next-month="nextMonth"
-      @go-to-today="goToToday"
-    />
+    <StarryBackground />
 
     <main class="calendar-body">
       <div class="calendar-left">
+        <div class="calendar-top-row">
+          <CalendarInfoBar />
+          <div class="calendar-nav-wrapper">
+            <CalendarHeader
+              :month-year-label="monthYearLabel"
+              :year-label="yearLabel"
+              :today-label="todayLabel"
+              :is-current-month="isCurrentMonth"
+              :is-transitioning="isTransitioning"
+              @prev-month="prevMonth"
+              @next-month="nextMonth"
+              @go-to-today="goToToday"
+            />
+          </div>
+        </div>
+
         <div class="weekday-row">
           <div
             v-for="(w, i) in weekdays"
@@ -294,12 +316,33 @@ function handleVoiceConfirm() {
 
         <FestivalCard :festival="getFestivalForDate(selectedDate)" />
 
-        <EventList
-          :events="getEventsForDate(selectedDate)"
-          :selected-date="selectedDate"
-          @select="onSelectEvent"
-          @add="openNewEvent"
-        />
+        <div class="right-date-section">
+          <div class="right-date-header">
+            <span class="right-date-day">{{ selectedDate.split('-')[2] }}</span>
+            <div class="right-date-info">
+              <span class="right-date-weekday">{{ getWeekdayLabel(selectedDate) }}</span>
+              <span class="right-date-full">{{ formatDateFull(selectedDate) }}</span>
+            </div>
+          </div>
+
+          <div class="right-events-list">
+            <div v-if="getEventsForDate(selectedDate).length === 0" class="right-events-empty">
+              当天暂无日程安排
+            </div>
+            <div
+              v-for="ev in getEventsForDate(selectedDate)"
+              :key="ev.id"
+              class="right-event-item"
+              @click="onSelectEvent(ev)"
+            >
+              <span class="right-event-dot" :style="{ background: ev.color || '#6366f1' }" />
+              <div class="right-event-info">
+                <span class="right-event-title">{{ ev.title }}</span>
+                <span class="right-event-time">{{ formatEventTime(ev) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="voice-center">
           <VoiceButton
@@ -366,11 +409,6 @@ function handleVoiceConfirm() {
       @delete="handleDeleteEvent"
     />
 
-    <BottomToolbar
-      :active-id="toolbarActiveId"
-      @select="onToolbarSelect"
-    />
-
     <InlineNote
       :open="noteOpen"
       :date-key="noteDateKey"
@@ -395,69 +433,44 @@ function handleVoiceConfirm() {
   overflow: hidden;
 }
 
-.bg-orbs {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.bg-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.15;
-
-  &--1 {
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(circle, $color-primary, transparent);
-    top: -5%;
-    right: -5%;
-    animation: orb-float-1 12s ease-in-out infinite;
-  }
-
-  &--2 {
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(circle, $color-info, transparent);
-    bottom: 10%;
-    left: -8%;
-    animation: orb-float-2 15s ease-in-out infinite;
-  }
-
-  &--3 {
-    width: 200px;
-    height: 200px;
-    background: radial-gradient(circle, $color-primary-light, transparent);
-    bottom: 30%;
-    right: 20%;
-    animation: orb-float-3 10s ease-in-out infinite;
-  }
-}
-
 .calendar-body {
   flex: 1;
   display: flex;
   flex-direction: row;
-  gap: $space-4;
-  padding: 0 $space-6 $space-2;
+  gap: $space-3;
+  padding: $space-6 $space-4 $space-3;
   position: relative;
   z-index: 1;
   overflow: hidden;
+  max-height: calc(100vh - 40px);
 }
 
 .calendar-left {
-  flex: 6;
+  flex: 5;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
 }
 
+.calendar-top-row {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  margin-bottom: $space-2;
+}
+
+.calendar-top-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-nav-wrapper {
+  flex-shrink: 0;
+}
+
 .calendar-right {
-  flex: 4;
+  flex: 5;
   display: flex;
   flex-direction: column;
   gap: $space-3;
@@ -470,7 +483,7 @@ function handleVoiceConfirm() {
 .weekday-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: $space-2 $space-1;
+  padding: $space-1 $space-1;
   margin-bottom: $space-1;
   background: linear-gradient(135deg, #1a1a3e, #2d2b6b);
   border-radius: $radius-md;
@@ -503,20 +516,101 @@ function handleVoiceConfirm() {
   margin-top: auto;
 }
 
-@keyframes orb-float-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -40px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
+.right-date-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: $space-3 $space-2;
 }
 
-@keyframes orb-float-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, -30px) scale(1.08); }
+.right-date-header {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding-bottom: $space-3;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: $space-3;
 }
 
-@keyframes orb-float-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.12; }
-  50% { transform: translate(-20px, -50px) scale(1.15); opacity: 0.2; }
+.right-date-day {
+  font-size: 40px;
+  font-weight: $font-weight-bold;
+  color: white;
+  line-height: 1;
+}
+
+.right-date-info {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+}
+
+.right-date-weekday {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.right-date-full {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.right-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.right-events-empty {
+  font-size: $font-size-base;
+  color: $color-text-tertiary;
+  text-align: center;
+  padding: $space-6 0;
+}
+
+.right-event-item {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-3;
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.right-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.right-event-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.right-event-title {
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.right-event-time {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
 }
 
 </style>

@@ -11,12 +11,11 @@ const emit = defineEmits<{
 }>()
 
 const buttons = [
+  { id: 'new', label: '新建', icon: '➕' },
   { id: 'month', label: '月', icon: '📅' },
-  { id: 'week', label: '周', icon: '📋' },
   { id: 'search', label: '搜索', icon: '🔍' },
   { id: 'settings', label: '设置', icon: '⚙️' },
-  { id: 'profile', label: '头像', icon: '👤' },
-  { id: 'day', label: '日', icon: '📆' }
+  { id: 'profile', label: '头像', icon: '👤' }
 ]
 </script>
 
@@ -43,10 +42,12 @@ const buttons = [
 
 .inline-toolbar {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: $space-1;
   padding: $space-2;
   background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border-radius: $radius-lg;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -78,12 +79,12 @@ const buttons = [
 }
 
 .inline-toolbar__icon {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .inline-toolbar__label {
-  font-size: $font-size-xs;
+  font-size: $font-size-sm;
   font-weight: $font-weight-medium;
   line-height: 1;
 }

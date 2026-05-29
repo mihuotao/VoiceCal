@@ -4,7 +4,7 @@
 
 // Glass defaults
 $glass-default-blur: 32px;
-$glass-default-opacity: 0.75;
+$glass-default-opacity: 0.45;
 $glass-default-saturate: 1.4;
 $glass-default-border-opacity: 0.12;
 $glass-default-radius: 16px;
@@ -48,14 +48,14 @@ $space-16: 64px;
 // Typography
 $font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 $font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
-$font-size-xs: 11px;
-$font-size-sm: 13px;
-$font-size-base: 14px;
-$font-size-lg: 16px;
-$font-size-xl: 20px;
-$font-size-2xl: 24px;
-$font-size-3xl: 32px;
-$font-size-4xl: 40px;
+$font-size-xs: 13px;
+$font-size-sm: 15px;
+$font-size-base: 16px;
+$font-size-lg: 18px;
+$font-size-xl: 22px;
+$font-size-2xl: 28px;
+$font-size-3xl: 36px;
+$font-size-4xl: 44px;
 $font-weight-normal: 400;
 $font-weight-medium: 500;
 $font-weight-semibold: 600;
@@ -94,8 +94,8 @@ $z-toast: 500;
 $z-voice-overlay: 600;
 
 // Calendar
-$calendar-cell-min-height: 56px;
-$calendar-cell-day-size: 20px;
+$calendar-cell-min-height: 42px;
+$calendar-cell-day-size: 24px;
 $calendar-cell-lunar-size: 12px;
 $calendar-cell-jieqi-size: 13px;
 $calendar-today-circle-size: 28px;

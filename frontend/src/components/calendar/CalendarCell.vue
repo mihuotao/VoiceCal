@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { motion } from 'motion-v'
 import { springPresets } from '@/composables/useMotion'
+import { getHolidayInfo } from '@/utils/holiday'
 import type { CalendarCellData } from '@/types/calendar'
 
 const props = withDefaults(defineProps<{
@@ -16,6 +18,20 @@ const emit = defineEmits<{
   select: [dateKey: string]
   dblclick: [dateKey: string]
 }>()
+
+const holiday = computed(() => {
+  if (!props.cell.isCurrentMonth) return null
+  return getHolidayInfo(props.cell.month + 1, props.cell.day)
+})
+
+const festivalName = computed(() => {
+  if (props.cell.festivals?.length > 0) return props.cell.festivals[0]
+  if (props.cell.jieQi) return props.cell.jieQi
+  if (holiday.value) return holiday.value.name
+  return ''
+})
+
+const isHoliday = computed(() => holiday.value?.isOff ?? false)
 
 function handleClick() {
   emit('select', props.cell.dateKey)
@@ -43,12 +59,13 @@ function handleDblClick() {
     @click="handleClick"
     @dblclick.prevent="handleDblClick"
   >
+    <span v-if="isHoliday" class="calendar-cell__holiday-badge">休</span>
+
     <div class="calendar-cell__top">
       <span v-if="cell.isToday" class="calendar-cell__today-circle">
         <span class="calendar-cell__day">{{ cell.day }}</span>
       </span>
       <span v-else class="calendar-cell__day">{{ cell.day }}</span>
-      <span v-if="cell.jieQi" class="calendar-cell__jieqi">{{ cell.jieQi }}</span>
     </div>
 
     <div class="calendar-cell__bottom">
@@ -56,6 +73,10 @@ function handleDblClick() {
         v-if="cell.lunarDay && cell.isCurrentMonth"
         class="calendar-cell__lunar"
       >{{ cell.lunarDay }}</span>
+      <span
+        v-if="festivalName && cell.isCurrentMonth"
+        class="calendar-cell__festival"
+      >{{ festivalName }}</span>
 
       <div v-if="hasEvents" class="calendar-cell__dots">
         <span class="dot" />
@@ -80,10 +101,12 @@ function handleDblClick() {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: $space-1 $space-2;
+  padding: 3px 5px;
   min-height: $calendar-cell-min-height;
-  border-radius: $radius-md;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: $radius-sm;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -100,7 +123,7 @@ function handleDblClick() {
 
   &--other {
     color: $color-text-tertiary;
-    opacity: 0.45;
+    opacity: 0.4;
   }
 
   &--today {
@@ -114,19 +137,23 @@ function handleDblClick() {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
+    animation: glow-pulse 3s ease-in-out infinite;
 
     &::before {
       content: '';
       position: absolute;
       inset: -2px;
-      border-radius: $radius-md;
+      border-radius: $radius-sm;
       background: conic-gradient(
         from var(--angle),
         transparent 0%,
-        rgba($color-primary, 0.1) 10%,
+        transparent 5%,
+        rgba($color-primary-light, 0.15) 10%,
+        rgba($color-primary-light, 0.5) 15%,
+        rgba(255, 255, 255, 0.95) 18%,
         $color-primary-light 20%,
-        rgba($color-primary, 0.6) 30%,
-        transparent 40%
+        rgba($color-primary, 0.4) 25%,
+        transparent 35%
       );
       z-index: -1;
       animation: border-flow 3s linear infinite;
@@ -135,23 +162,49 @@ function handleDblClick() {
     &::after {
       content: '';
       position: absolute;
-      inset: 0;
-      border-radius: calc(#{$radius-md} - 1px);
-      background: rgba(15, 12, 41, 0.92);
-      z-index: -1;
+      inset: -1px;
+      border-radius: calc(#{$radius-sm} + 1px);
+      background: conic-gradient(
+        from var(--angle),
+        transparent 0%,
+        transparent 14%,
+        rgba(255, 255, 255, 0.6) 17%,
+        rgba(255, 255, 255, 0.9) 18%,
+        rgba(255, 255, 255, 0.6) 19%,
+        transparent 22%,
+        transparent 100%
+      );
+      z-index: -2;
+      animation: border-flow 3s linear infinite;
     }
 
     &:hover {
-      &::after {
-        background: rgba(15, 12, 41, 0.85);
-      }
+      background: transparent;
     }
+  }
+
+  &__holiday-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: $font-weight-bold;
+    color: white;
+    background: #ef4444;
+    border-radius: 50%;
+    z-index: 1;
+    line-height: 1;
   }
 
   &__top {
     display: flex;
     align-items: center;
-    gap: $space-1;
+    gap: 2px;
   }
 
   &__today-circle {
@@ -170,18 +223,21 @@ function handleDblClick() {
     line-height: 1;
   }
 
-  &__jieqi {
-    font-size: $calendar-cell-jieqi-size;
-    color: $color-warning;
-    font-weight: $font-weight-medium;
-    line-height: 1;
-  }
-
   &__bottom {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: $space-1;
+    gap: 2px;
+    flex-wrap: wrap;
+  }
+
+  &__festival {
+    font-size: 11px;
+    color: $color-warning;
+    font-weight: $font-weight-semibold;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__lunar {
@@ -191,7 +247,6 @@ function handleDblClick() {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
   }
 
   &__dots {
@@ -200,8 +255,8 @@ function handleDblClick() {
     gap: 2px;
 
     .dot {
-      width: 4px;
-      height: 4px;
+      width: 3px;
+      height: 3px;
       border-radius: 50%;
       background: $color-primary-light;
     }
@@ -211,6 +266,15 @@ function handleDblClick() {
 @keyframes border-flow {
   to {
     --angle: 360deg;
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba($color-primary, 0.2), 0 0 16px rgba($color-primary, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba($color-primary, 0.4), 0 0 24px rgba($color-primary, 0.2);
   }
 }
 </style>

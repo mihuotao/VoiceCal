@@ -90,7 +90,7 @@ function formatDateLabel(dateKey: string) {
 }
 
 .event-list__title {
-  font-size: $font-size-sm;
+  font-size: $font-size-base;
   font-weight: $font-weight-semibold;
   color: $color-text-secondary;
 }

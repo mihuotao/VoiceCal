@@ -39,8 +39,8 @@ const show = computed(() => props.festival !== null)
   gap: $space-3;
   padding: $space-3 $space-4;
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: $radius-lg;
   margin: $space-2 0;
