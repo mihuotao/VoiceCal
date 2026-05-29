@@ -45,6 +45,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public boolean checkEmailExistsExcludeId(String email, Long excludeId) {
+        return userMapper.selectCount(
+                new LambdaQueryWrapper<User>()
+                        .eq(User::getEmail, email)
+                        .ne(User::getId, excludeId)) > 0;
+    }
+
+    @Override
     public Long register(String username, String password, String nickname, String email, String phone) {
         User user = new User();
         user.setUsername(username);
@@ -63,6 +71,32 @@ public class UserServiceImpl implements UserService {
         user.setId(userId);
         user.setLastLoginAt(LocalDateTime.now());
         userMapper.updateById(user);
+    }
+
+    @Override
+    public void updateUser(Long userId, String nickname, String email, String phone, String avatar) {
+        User user = new User();
+        user.setId(userId);
+        user.setNickname(nickname);
+        user.setEmail(email);
+        user.setPhone(phone);
+        user.setAvatar(avatar);
+        userMapper.updateById(user);
+    }
+
+    @Override
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        if (!BCrypt.checkpw(oldPassword, user.getPassword())) {
+            throw new IllegalArgumentException("原密码错误");
+        }
+        User update = new User();
+        update.setId(userId);
+        update.setPassword(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
+        userMapper.updateById(update);
     }
 
 }
