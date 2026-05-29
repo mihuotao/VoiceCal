@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
+import CalendarGrid from '@/components/calendar/CalendarGrid.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import { useCalendar } from '@/composables/useCalendar'
@@ -11,9 +12,12 @@ const {
   todayLabel,
   isCurrentMonth,
   isTransitioning,
+  calendarCells,
+  selectedDate,
   nextMonth,
   prevMonth,
-  goToToday
+  goToToday,
+  selectDate
 } = useCalendar()
 
 const {
@@ -53,19 +57,11 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
         </div>
       </div>
 
-      <div class="calendar-grid">
-        <div class="grid-placeholder">
-          <span class="grid-placeholder__icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-          </span>
-          <p>日历网格将在 Step 5 构建</p>
-        </div>
-      </div>
+      <CalendarGrid
+        :cells="calendarCells"
+        :selected-date="selectedDate"
+        @select-date="selectDate"
+      />
     </main>
 
     <div class="voice-center">
@@ -151,7 +147,7 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: $space-2 $space-6 $space-6;
+  padding: 0 $space-6 $space-2;
   position: relative;
   z-index: 1;
   overflow: hidden;
@@ -174,26 +170,6 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   padding: $space-1 0;
 }
 
-.calendar-grid {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.grid-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $space-3;
-  color: $color-text-tertiary;
-  font-size: $font-size-sm;
-
-  p {
-    opacity: 0.5;
-  }
-}
-
 .voice-center {
   position: absolute;
   bottom: 72px;
@@ -204,8 +180,6 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   align-items: center;
   justify-content: center;
 }
-
-
 
 .bottom-toolbar {
   height: $calendar-bottom-toolbar-height;

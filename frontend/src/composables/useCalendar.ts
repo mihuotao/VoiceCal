@@ -1,4 +1,6 @@
 import { ref, computed } from 'vue'
+import { getLunarInfo } from '@/utils/lunar'
+import type { CalendarCellData } from '@/types/calendar'
 
 export type MonthDirection = 'left' | 'right' | 'none'
 
@@ -6,6 +8,7 @@ export function useCalendar() {
   const now = new Date()
   const currentYear = ref(now.getFullYear())
   const currentMonth = ref(now.getMonth())
+  const selectedDate = ref<string>(`${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`)
   const transitionDirection = ref<MonthDirection>('none')
   const isTransitioning = ref(false)
   const supportsViewTransition = typeof document !== 'undefined'
@@ -99,11 +102,79 @@ export function useCalendar() {
     navigateMonth(-1)
   }
 
+  const calendarCells = computed<CalendarCellData[]>(() => {
+    const cells: CalendarCellData[] = []
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`
+
+    const totalCells = totalGridCells.value
+    const firstDay = firstDayOfMonth.value
+    const prevMonth = currentMonth.value === 0 ? 11 : currentMonth.value - 1
+    const prevYear = currentMonth.value === 0 ? currentYear.value - 1 : currentYear.value
+    const prevDays = getDaysInMonth(prevYear, prevMonth)
+
+    for (let i = 0; i < totalCells; i++) {
+      let cellYear: number, cellMonth: number, cellDay: number
+      let isCurrentMonth: boolean
+
+      if (i < firstDay) {
+        cellYear = prevYear
+        cellMonth = prevMonth
+        cellDay = prevDays - firstDay + i + 1
+        isCurrentMonth = false
+      } else if (i >= firstDay + daysInMonth.value) {
+        const nextMonth = currentMonth.value === 11 ? 0 : currentMonth.value + 1
+        const nextYear = currentMonth.value === 11 ? currentYear.value + 1 : currentYear.value
+        cellYear = nextYear
+        cellMonth = nextMonth
+        cellDay = i - firstDay - daysInMonth.value + 1
+        isCurrentMonth = false
+      } else {
+        cellYear = currentYear.value
+        cellMonth = currentMonth.value
+        cellDay = i - firstDay + 1
+        isCurrentMonth = true
+      }
+
+      const dateKey = `${cellYear}-${cellMonth + 1}-${cellDay}`
+      const isToday = dateKey === todayStr
+      const date = new Date(cellYear, cellMonth, cellDay)
+
+      const lunar = getLunarInfo(cellYear, cellMonth, cellDay)
+
+      cells.push({
+        year: cellYear,
+        month: cellMonth,
+        day: cellDay,
+        isCurrentMonth,
+        isToday,
+        lunarDay: lunar.lunarDay,
+        lunarMonth: lunar.lunarMonth,
+        festivals: lunar.festivals,
+        jieQi: lunar.jieQi,
+        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        dateKey
+      })
+    }
+
+    return cells
+  })
+
+  function selectDate(dateKey: string) {
+    selectedDate.value = dateKey
+  }
+
   function goToToday() {
     const d = new Date()
     currentYear.value = d.getFullYear()
     currentMonth.value = d.getMonth()
+    selectedDate.value = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
     transitionDirection.value = 'none'
+  }
+
+  function goToDate(year: number, month: number) {
+    currentYear.value = year
+    currentMonth.value = month
   }
 
   return {
@@ -117,11 +188,15 @@ export function useCalendar() {
     firstDayOfMonth,
     prevMonthDays,
     totalGridCells,
+    calendarCells,
+    selectedDate,
     transitionDirection,
     isTransitioning,
     nextMonth,
     prevMonth,
     goToToday,
+    goToDate,
+    selectDate,
     navigateMonth,
     supportsViewTransition
   }

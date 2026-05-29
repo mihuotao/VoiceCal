@@ -9,6 +9,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/lunar-javascript')) return 'lunar'
+          if (id.includes('node_modules/@fullcalendar')) return 'fullcalendar'
+          if (id.includes('node_modules')) return 'vendor'
+        }
+      }
+    }
+  },
   css: {
     preprocessorOptions: {
       scss: {
