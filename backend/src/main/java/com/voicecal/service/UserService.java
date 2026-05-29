@@ -26,4 +26,7 @@ public interface UserService {
 
     List<User> listAll();
 
+    com.baomidou.mybatisplus.extension.plugins.pagination.Page<User> listByQuery(
+            String keyword, Integer status, int page, int size);
+
 }

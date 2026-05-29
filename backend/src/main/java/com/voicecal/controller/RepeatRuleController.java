@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.format.DateTimeFormatter;
 
 @RestController
-@RequestMapping("/events/{eventId}/repeat-rule")
+@RequestMapping("/api/v1/events/{eventId}/repeat-rule")
 public class RepeatRuleController {
 
     private final RepeatRuleService repeatRuleService;

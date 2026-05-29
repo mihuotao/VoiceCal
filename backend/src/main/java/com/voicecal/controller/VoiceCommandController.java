@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/voice")
+@RequestMapping("/api/v1/voice")
 public class VoiceCommandController {
 
     private final VoiceCommandService voiceCommandService;

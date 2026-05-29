@@ -13,7 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/festivals")
+@RequestMapping("/api/v1/festivals")
 public class FestivalController {
 
     private final FestivalService festivalService;

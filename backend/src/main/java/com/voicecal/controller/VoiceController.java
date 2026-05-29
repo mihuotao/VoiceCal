@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Base64;
 
 @RestController
-@RequestMapping("/voice")
+@RequestMapping("/api/v1/voice")
 public class VoiceController {
 
     private final BaiduTtsService ttsService;

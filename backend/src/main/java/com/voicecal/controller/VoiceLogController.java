@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/voice-logs")
+@RequestMapping("/api/v1/voice-logs")
 public class VoiceLogController {
 
     private final VoiceCommandLogService voiceCommandLogService;

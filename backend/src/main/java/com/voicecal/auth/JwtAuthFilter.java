@@ -15,7 +15,7 @@ import java.util.Set;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final Set<String> WHITE_LIST = Set.of(
-            "/auth/register", "/auth/login", "/auth/refresh",
+            "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
             "/api-docs", "/swagger-ui", "/v3/api-docs",
             "/swagger-resources", "/webjars");
 
@@ -43,6 +43,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         try {
+            if (jwtProvider.isTokenInvalidated(token)) {
+                writeUnauthorized(response, "Token 已失效");
+                return;
+            }
             Long userId = jwtProvider.getUserIdFromToken(token);
             String username = jwtProvider.getUsernameFromToken(token);
             UserContext.set(new LoginUser(userId, username));

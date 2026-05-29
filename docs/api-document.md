@@ -1,6 +1,6 @@
 # VoiceCal 智能语音日历 — API 接口文档
 
-**版本**: v1.0  
+**版本**: v1.1  
 **基础URL**: `http://localhost:8080/api/v1`  
 **字符编码**: UTF-8  
 **数据格式**: JSON
@@ -215,11 +215,18 @@ Authorization: Bearer <token>
 
 **Headers**: Authorization: Bearer \<token\>
 
+**Request Body**（可选）:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
 **Response 200**:
 ```json
 {
   "code": 200,
-  "message": "退出成功"
+  "message": "success"
 }
 ```
 
@@ -295,9 +302,40 @@ Authorization: Bearer <token>
 
 ### 3.4 获取用户列表（管理员）
 
-`GET /users?page=1&size=20&status=1`
+`GET /users?page=1&size=20&keyword=zhang&status=1`
+
+| 参数    | 类型   | 必填 | 说明                   |
+| ------- | ------ | ---- | ---------------------- |
+| page    | int    | 否   | 默认 1                 |
+| size    | int    | 否   | 默认 20                |
+| keyword | string | 否   | 模糊匹配用户名/昵称    |
+| status  | int    | 否   | 1=启用 0=禁用          |
 
 **Response 200**（分页响应）:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "content": [
+      {
+        "id": 1,
+        "username": "zhangsan",
+        "nickname": "张三",
+        "email": "zhangsan@example.com",
+        "phone": "13800138000",
+        "status": 1,
+        "lastLoginAt": "2026-05-29T10:30:00",
+        "createdAt": "2026-05-01T08:00:00"
+      }
+    ],
+    "page": 1,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  }
+}
+```
 
 ---
 
@@ -362,6 +400,21 @@ Authorization: Bearer <token>
 {
   "code": 200,
   "message": "更新成功",
+  "data": { ... }
+}
+```
+
+### 4.3 重置偏好设置
+
+`PATCH /preferences/reset`
+
+重置为系统默认值。
+
+**Response 200**:
+```json
+{
+  "code": 200,
+  "message": "success",
   "data": { ... }
 }
 ```
@@ -1274,3 +1327,8 @@ Authorization: Bearer <token>
 | POST      | /voice/asr                                    | 语音转文本         |
 | POST      | /voice/festival-greeting                      | 节日关怀播报       |
 | GET       | /audit-logs                                   | 审计日志           |
+| POST      | /auth/refresh                                 | 刷新 Token         |
+| POST      | /auth/logout                                  | 退出登录           |
+| GET       | /preferences                                  | 获取偏好设置       |
+| PATCH     | /preferences                                  | 更新偏好设置       |
+| PATCH     | /preferences/reset                            | 重置偏好设置       |

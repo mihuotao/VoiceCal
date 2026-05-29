@@ -11,12 +11,15 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class JwtProvider {
 
     private final SecretKey key;
     private final long expiration;
+    private final Set<String> blacklist = ConcurrentHashMap.newKeySet();
 
     public JwtProvider(
             @Value("${jwt.secret}") String secret,
@@ -34,6 +37,10 @@ public class JwtProvider {
                 .expiration(new Date(now.getTime() + expiration))
                 .signWith(key)
                 .compact();
+    }
+
+    public String getTokenId(String token) {
+        return validateToken(token).getId();
     }
 
     public Claims validateToken(String token) {
@@ -60,6 +67,14 @@ public class JwtProvider {
 
     public long getExpiration() {
         return expiration;
+    }
+
+    public void invalidateToken(String token) {
+        blacklist.add(token);
+    }
+
+    public boolean isTokenInvalidated(String token) {
+        return blacklist.contains(token);
     }
 
 }

@@ -2,6 +2,7 @@ package com.voicecal.service.impl;
 
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.voicecal.entity.User;
 import com.voicecal.mapper.UserMapper;
 import com.voicecal.service.UserService;
@@ -83,6 +84,21 @@ public class UserServiceImpl implements UserService {
         user.setPhone(phone);
         user.setAvatar(avatar);
         userMapper.updateById(user);
+    }
+
+    @Override
+    public Page<User> listByQuery(String keyword, Integer status, int page, int size) {
+        Page<User> mpPage = new Page<>(page, size);
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.and(w -> w.like(User::getUsername, keyword)
+                    .or().like(User::getNickname, keyword));
+        }
+        if (status != null) {
+            wrapper.eq(User::getStatus, status);
+        }
+        wrapper.orderByDesc(User::getCreatedAt);
+        return userMapper.selectPage(mpPage, wrapper);
     }
 
     @Override

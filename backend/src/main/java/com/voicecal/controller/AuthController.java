@@ -1,11 +1,14 @@
 package com.voicecal.controller;
 
 import cn.hutool.crypto.digest.BCrypt;
+import com.voicecal.auth.CurrentUser;
 import com.voicecal.auth.JwtProvider;
+import com.voicecal.auth.LoginUser;
 import com.voicecal.common.ApiResult;
 import com.voicecal.common.ResultCode;
 import com.voicecal.entity.User;
 import com.voicecal.model.dto.LoginRequest;
+import com.voicecal.model.dto.RefreshTokenRequest;
 import com.voicecal.model.dto.RegisterRequest;
 import com.voicecal.model.vo.LoginUserVO;
 import com.voicecal.service.UserService;
@@ -16,9 +19,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final UserService userService;
@@ -54,6 +58,29 @@ public class AuthController {
         vo.setNickname(nickname);
 
         return ApiResult.created(vo);
+    }
+
+    @PostMapping("/refresh")
+    public ApiResult<Map<String, Object>> refresh(@Valid @RequestBody RefreshTokenRequest req) {
+        try {
+            Long userId = jwtProvider.getUserIdFromToken(req.getToken());
+            String username = jwtProvider.getUsernameFromToken(req.getToken());
+            String newToken = jwtProvider.generateToken(userId, username);
+            return ApiResult.success(Map.of(
+                    "token", newToken,
+                    "expiresIn", jwtProvider.getExpiration()));
+        } catch (Exception e) {
+            return ApiResult.error(ResultCode.TOKEN_INVALID);
+        }
+    }
+
+    @PostMapping("/logout")
+    public ApiResult<Void> logout(@CurrentUser LoginUser loginUser,
+                                   @RequestBody(required = false) Map<String, String> body) {
+        if (body != null && body.get("token") != null) {
+            jwtProvider.invalidateToken(body.get("token"));
+        }
+        return ApiResult.success();
     }
 
     @PostMapping("/login")

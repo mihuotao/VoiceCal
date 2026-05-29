@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/audit-logs")
+@RequestMapping("/api/v1/audit-logs")
 public class AuditLogController {
 
     private final AuditLogService auditLogService;
