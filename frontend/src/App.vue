@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, onMounted } from 'vue'
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
 import CalendarGrid from '@/components/calendar/CalendarGrid.vue'
 import BottomToolbar from '@/components/calendar/BottomToolbar.vue'
 import InlineNote from '@/components/calendar/InlineNote.vue'
+import EventList from '@/components/calendar/EventList.vue'
+import EventForm from '@/components/calendar/EventForm.vue'
+import EventDetail from '@/components/calendar/EventDetail.vue'
+import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import { useCalendar } from '@/composables/useCalendar'
 import { useVoice } from '@/composables/useVoice'
+import { useEvents } from '@/composables/useEvents'
+import type { CalendarEvent } from '@/types/event'
 
 const {
   monthYearLabel,
@@ -35,6 +41,16 @@ const {
   stopRecording
 } = useVoice()
 
+const {
+  datesWithEvents,
+  getEventsForDate,
+  fetchEvents,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  checkConflicts
+} = useEvents()
+
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
 const toolbarActiveId = ref('month')
@@ -42,6 +58,17 @@ const noteDateKey = shallowRef('')
 const noteText = ref('')
 const noteOpen = ref(false)
 const notes = ref<Record<string, string>>({})
+
+const eventFormOpen = ref(false)
+const eventDetailOpen = ref(false)
+const editingEvent = ref<CalendarEvent | null>(null)
+const formInitialDate = ref('')
+const selectedEvent = ref<CalendarEvent | null>(null)
+const conflicts = ref<CalendarEvent[]>([])
+
+onMounted(() => {
+  fetchEvents()
+})
 
 function onToolbarSelect(id: string) {
   toolbarActiveId.value = id
@@ -64,6 +91,87 @@ function onNoteSave(dateKey: string, text: string) {
 function formatDateLabel(dateKey: string) {
   const [y, m, d] = dateKey.split('-')
   return `${y}年${parseInt(m)}月${parseInt(d)}日`
+}
+
+function openNewEvent(dateKey: string) {
+  editingEvent.value = null
+  formInitialDate.value = dateKey
+  eventFormOpen.value = true
+}
+
+function openEditEvent(ev: CalendarEvent) {
+  editingEvent.value = ev
+  formInitialDate.value = ''
+  eventFormOpen.value = true
+}
+
+async function handleSaveEvent(data: { title: string; description: string; date: string; startTime: string; endTime: string; allDay: boolean; location: string; color: string; category: string }) {
+  const startTime = data.allDay
+    ? new Date(data.date + 'T00:00:00').toISOString()
+    : new Date(data.date + 'T' + data.startTime + ':00').toISOString()
+  const endTime = data.allDay
+    ? new Date(data.date + 'T23:59:59').toISOString()
+    : new Date(data.date + 'T' + data.endTime + ':00').toISOString()
+
+  const eventConflicts = checkConflicts(startTime, endTime, editingEvent.value?.id)
+  conflicts.value = eventConflicts
+
+  if (eventConflicts.length > 0) return
+
+  if (editingEvent.value) {
+    await updateEvent(editingEvent.value.id, {
+      title: data.title,
+      description: data.description,
+      startTime,
+      endTime,
+      allDay: data.allDay,
+      location: data.location,
+      color: data.color,
+      category: data.category
+    })
+  } else {
+    await createEvent({
+      title: data.title,
+      description: data.description,
+      startTime,
+      endTime,
+      allDay: data.allDay,
+      location: data.location,
+      color: data.color,
+      category: data.category
+    })
+  }
+  eventFormOpen.value = false
+}
+
+function handleDeleteEvent(id: number) {
+  deleteEvent(id)
+  eventDetailOpen.value = false
+  eventFormOpen.value = false
+}
+
+function handleConflictResolve() {
+  conflicts.value = []
+  eventFormOpen.value = true
+}
+
+function handleConflictIgnore() {
+  conflicts.value = []
+  handleSaveEventFinal()
+}
+
+let pendingSaveData: any = null
+
+function handleSaveEventFinal() {
+  if (pendingSaveData) {
+    handleSaveEvent(pendingSaveData)
+    pendingSaveData = null
+  }
+}
+
+function onSelectEvent(ev: CalendarEvent) {
+  selectedEvent.value = ev
+  eventDetailOpen.value = true
 }
 </script>
 
@@ -96,10 +204,24 @@ function formatDateLabel(dateKey: string) {
       <CalendarGrid
         :cells="calendarCells"
         :selected-date="selectedDate"
+        :dates-with-events="datesWithEvents"
         @select-date="selectDate"
         @cell-dblclick="onCellDblclick"
       />
+
+      <EventList
+        :events="getEventsForDate(selectedDate)"
+        :selected-date="selectedDate"
+        @select="onSelectEvent"
+        @add="openNewEvent"
+      />
     </main>
+
+    <ConflictPanel
+      :conflicts="conflicts"
+      @resolve="handleConflictResolve"
+      @ignore="handleConflictIgnore"
+    />
 
     <div class="voice-center">
       <VoiceButton
@@ -122,6 +244,23 @@ function formatDateLabel(dateKey: string) {
       @stop-record="stopRecording"
       @retry="startRecording"
       @edit-result="closeOverlay"
+    />
+
+    <EventForm
+      :open="eventFormOpen"
+      :event="editingEvent"
+      :initial-date="formInitialDate"
+      @close="eventFormOpen = false"
+      @save="handleSaveEvent"
+      @delete="handleDeleteEvent"
+    />
+
+    <EventDetail
+      :open="eventDetailOpen"
+      :event="selectedEvent"
+      @close="eventDetailOpen = false"
+      @edit="openEditEvent"
+      @delete="handleDeleteEvent"
     />
 
     <BottomToolbar

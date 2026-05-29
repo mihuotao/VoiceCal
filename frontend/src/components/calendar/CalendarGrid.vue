@@ -6,6 +6,7 @@ import type { CalendarCellData } from '@/types/calendar'
 const props = defineProps<{
   cells: CalendarCellData[]
   selectedDate: string
+  datesWithEvents?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -34,6 +35,7 @@ const rows = computed(() => {
         :key="cell.dateKey"
         :cell="cell"
         :is-selected="cell.dateKey === selectedDate"
+        :has-events="datesWithEvents?.has(cell.dateKey) ?? false"
         @select="emit('selectDate', $event)"
         @dblclick="emit('cellDblclick', $event)"
       />
