@@ -12,11 +12,13 @@ const props = withDefaults(defineProps<{
   status?: VoiceStatus
   amplitude?: number
   transcript?: string
+  partialText?: string
   intent?: ParsedIntent | null
 }>(), {
   status: 'idle',
   amplitude: 0,
   transcript: '',
+  partialText: '',
   intent: null
 })
 
@@ -124,7 +126,7 @@ function handleClose() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="voice-spinner">
                 <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10" />
               </svg>
-              识别中
+              {{ partialText || '识别中' }}
             </span>
           </div>
         </div>

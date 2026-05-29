@@ -1,5 +1,8 @@
 import { ref } from 'vue'
+import { useWebSocket } from '@/composables/useWebSocket'
 import type { VoiceStatus, ASRResult, ParsedIntent } from '@/types/voice'
+
+const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/voice`
 
 export function useVoice() {
   const status = ref<VoiceStatus>('idle')
@@ -15,6 +18,9 @@ export function useVoice() {
   let audioDataArray: Uint8Array | null = null
   let rafId = 0
   let audioChunks: Blob[] = []
+  let sessionId = ''
+
+  const { wsStatus, connect, disconnect, send, onMessage } = useWebSocket(WS_URL)
 
   function startRealAmplitude(stream: MediaStream) {
     audioContext = new AudioContext()
@@ -49,6 +55,60 @@ export function useVoice() {
     stopRealAmplitude()
   }
 
+  function generateSessionId() {
+    return `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  }
+
+  function setupWsHandlers() {
+    onMessage((data: string) => {
+      try {
+        const msg = JSON.parse(data)
+        switch (msg.type) {
+          case 'intermediate_result':
+            if (msg.payload.isFinal) {
+              transcript.value = msg.payload.text
+              partialText.value = ''
+            } else {
+              partialText.value = msg.payload.text
+            }
+            break
+
+          case 'final_result':
+            status.value = 'result'
+            transcript.value = transcript.value || msg.payload.title || ''
+            parsedIntent.value = {
+              action: msg.payload.action || 'create',
+              title: msg.payload.title || transcript.value,
+              description: msg.payload.description || '',
+              startTime: msg.payload.startTime || new Date(Date.now() + 86400000).toISOString(),
+              endTime: msg.payload.endTime || new Date(Date.now() + 86400000 + 3600000).toISOString(),
+              confidence: msg.payload.confidence || 0.9
+            }
+            break
+
+          case 'error':
+            console.warn('ASR error:', msg.payload.message)
+            fallbackToMock()
+            break
+        }
+      } catch {
+        // ignore parse errors
+      }
+    })
+  }
+
+  function fallbackToMock() {
+    setTimeout(() => {
+      const mockResult: ASRResult = {
+        text: mockASR(),
+        isFinal: true
+      }
+      transcript.value = mockResult.text
+      parsedIntent.value = parseIntent(mockResult.text)
+      status.value = 'result'
+    }, 800 + Math.random() * 600)
+  }
+
   async function startRecording(): Promise<boolean> {
     let stream: MediaStream | null = null
     try {
@@ -58,7 +118,13 @@ export function useVoice() {
     }
 
     audioChunks = []
+    sessionId = generateSessionId()
     startRealAmplitude(stream)
+
+    setupWsHandlers()
+    if (wsStatus.value !== 'open') {
+      connect()
+    }
 
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
@@ -88,16 +154,35 @@ export function useVoice() {
     stopAmplitude()
   }
 
-  function sendToASR(_audioBlob: Blob) {
-    setTimeout(() => {
-      const mockResult: ASRResult = {
-        text: mockASR(),
-        isFinal: true
+  async function sendToASR(audioBlob: Blob) {
+    if (wsStatus.value === 'open') {
+      try {
+        const buffer = await audioBlob.arrayBuffer()
+        const base64 = arrayBufferToBase64(buffer)
+        send(JSON.stringify({
+          type: 'audio_data',
+          sessionId,
+          payload: {
+            audioBase64: base64,
+            format: 'webm',
+            sampleRate: 48000
+          }
+        }))
+        return
+      } catch {
+        // fall through to mock
       }
-      transcript.value = mockResult.text
-      parsedIntent.value = parseIntent(mockResult.text)
-      status.value = 'result'
-    }, 800 + Math.random() * 600)
+    }
+    fallbackToMock()
+  }
+
+  function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
   }
 
   function mockASR(): string {
@@ -139,6 +224,7 @@ export function useVoice() {
       mediaRecorder.stop()
     }
     mediaRecorder = null
+    disconnect()
   }
 
   function setStatus(s: VoiceStatus) {
@@ -155,6 +241,7 @@ export function useVoice() {
       mediaRecorder.stop()
     }
     mediaRecorder = null
+    disconnect()
   }
 
   return {

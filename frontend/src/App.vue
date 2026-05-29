@@ -8,6 +8,7 @@ import EventList from '@/components/calendar/EventList.vue'
 import EventForm from '@/components/calendar/EventForm.vue'
 import EventDetail from '@/components/calendar/EventDetail.vue'
 import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
+import FestivalCard from '@/components/calendar/FestivalCard.vue'
 import SearchPanel from '@/components/search/SearchPanel.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
@@ -15,6 +16,12 @@ import { useCalendar } from '@/composables/useCalendar'
 import { useVoice } from '@/composables/useVoice'
 import { useEvents } from '@/composables/useEvents'
 import { useSearch } from '@/composables/useSearch'
+import { useAuth } from '@/composables/useAuth'
+import { usePreferences } from '@/composables/usePreferences'
+import { useFestival } from '@/composables/useFestival'
+import { useTts } from '@/composables/useTts'
+import LoginPage from '@/components/auth/LoginPage.vue'
+import SettingsPanel from '@/components/settings/SettingsPanel.vue'
 import type { CalendarEvent } from '@/types/event'
 import type { SearchResultItem } from '@/types/search'
 
@@ -37,6 +44,7 @@ const {
   amplitude,
   isOverlayOpen,
   transcript,
+  partialText,
   parsedIntent,
   openOverlay,
   closeOverlay,
@@ -62,6 +70,12 @@ const isSearching = s.isSearching
 const search = s.search
 const clearSearch = s.clearSearch
 
+const { isAuthenticated, logout } = useAuth()
+const { fetchPreferences } = usePreferences()
+const { getFestivalForDate } = useFestival()
+const { speak } = useTts()
+const settingsOpen = ref(false)
+
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
 const toolbarActiveId = ref('month')
@@ -80,12 +94,17 @@ const conflicts = ref<CalendarEvent[]>([])
 
 onMounted(() => {
   fetchEvents()
+  fetchPreferences()
 })
 
 function onToolbarSelect(id: string) {
   toolbarActiveId.value = id
   if (id === 'search') {
     searchOpen.value = true
+  } else if (id === 'settings') {
+    settingsOpen.value = !settingsOpen.value
+  } else if (id === 'profile') {
+    logout()
   }
 }
 
@@ -205,10 +224,20 @@ function handleCloseSearch() {
   searchOpen.value = false
   clearSearch()
 }
+
+function handleVoiceConfirm() {
+  closeOverlay()
+  const intent = parsedIntent.value
+  if (intent) {
+    speak(`好的，已为你${intent.action === 'search' ? '搜索' : '创建日程'}：${intent.title}`)
+  }
+}
 </script>
 
 <template>
-  <div class="app-shell">
+  <LoginPage v-if="!isAuthenticated" />
+
+  <div v-else class="app-shell">
     <div class="bg-orbs">
       <div class="bg-orb bg-orb--1" />
       <div class="bg-orb bg-orb--2" />
@@ -240,6 +269,8 @@ function handleCloseSearch() {
         @select-date="selectDate"
         @cell-dblclick="onCellDblclick"
       />
+
+      <FestivalCard :festival="getFestivalForDate(selectedDate)" />
 
       <EventList
         :events="getEventsForDate(selectedDate)"
@@ -275,14 +306,20 @@ function handleCloseSearch() {
       @create-event="handleSearchCreateEvent"
     />
 
+    <SettingsPanel
+      :open="settingsOpen"
+      @close="settingsOpen = false"
+    />
+
     <VoiceOverlay
       :open="isOverlayOpen"
       :status="status"
       :amplitude="amplitude"
       :transcript="transcript"
+      :partial-text="partialText"
       :intent="parsedIntent"
       @close="closeOverlay"
-      @confirm-create="closeOverlay"
+      @confirm-create="handleVoiceConfirm"
       @start-record="startRecording"
       @stop-record="stopRecording"
       @retry="startRecording"
