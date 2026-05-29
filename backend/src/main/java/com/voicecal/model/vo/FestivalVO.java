@@ -11,6 +11,7 @@ public class FestivalVO {
     private String type;
     private String description;
     private String greeting;
+    private String suggestions;
     private String icon;
     private Boolean isLunar;
     private String lunarDate;
