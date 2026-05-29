@@ -50,14 +50,14 @@ const rows = computed(() => {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 1px;
+  gap: 2px;
   margin: 0;
 }
 
 .calendar-grid__row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
+  gap: 2px;
   flex: 1;
   min-height: 0;
 }

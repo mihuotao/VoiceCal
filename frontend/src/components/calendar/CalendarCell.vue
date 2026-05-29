@@ -44,7 +44,10 @@ function handleDblClick() {
     @dblclick.prevent="handleDblClick"
   >
     <div class="calendar-cell__top">
-      <span class="calendar-cell__day">{{ cell.day }}</span>
+      <span v-if="cell.isToday" class="calendar-cell__today-circle">
+        <span class="calendar-cell__day">{{ cell.day }}</span>
+      </span>
+      <span v-else class="calendar-cell__day">{{ cell.day }}</span>
       <span v-if="cell.jieQi" class="calendar-cell__jieqi">{{ cell.jieQi }}</span>
     </div>
 
@@ -58,10 +61,16 @@ function handleDblClick() {
         <span class="dot" />
       </div>
     </div>
-
-    <div v-if="cell.isToday" class="calendar-cell__indicator" />
   </motion.div>
 </template>
+
+<style>
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+</style>
 
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
@@ -71,9 +80,10 @@ function handleDblClick() {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: $space-2 $space-2;
+  padding: $space-1 $space-2;
   min-height: $calendar-cell-min-height;
   border-radius: $radius-md;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -95,37 +105,76 @@ function handleDblClick() {
 
   &--today {
     .calendar-cell__day {
-      color: $color-primary-light;
+      color: white;
       font-weight: $font-weight-bold;
     }
   }
 
   &--selected {
-    background: rgba($color-primary, 0.12);
-    box-shadow: inset 0 0 0 1px rgba($color-primary, 0.25);
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: $radius-md;
+      background: conic-gradient(
+        from var(--angle),
+        transparent 0%,
+        rgba($color-primary, 0.1) 10%,
+        $color-primary-light 20%,
+        rgba($color-primary, 0.6) 30%,
+        transparent 40%
+      );
+      z-index: -1;
+      animation: border-flow 3s linear infinite;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: calc(#{$radius-md} - 1px);
+      background: rgba(15, 12, 41, 0.92);
+      z-index: -1;
+    }
 
     &:hover {
-      background: rgba($color-primary, 0.16);
+      &::after {
+        background: rgba(15, 12, 41, 0.85);
+      }
     }
   }
 
   &__top {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: $space-1;
   }
 
+  &__today-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: $calendar-today-circle-size;
+    height: $calendar-today-circle-size;
+    border-radius: 50%;
+    background: rgba($color-primary, 0.25);
+  }
+
   &__day {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    line-height: 1.2;
+    font-size: $calendar-cell-day-size;
+    font-weight: $font-weight-bold;
+    line-height: 1;
   }
 
   &__jieqi {
-    font-size: $font-size-xs;
+    font-size: $calendar-cell-jieqi-size;
     color: $color-warning;
     font-weight: $font-weight-medium;
-    line-height: 1.2;
+    line-height: 1;
   }
 
   &__bottom {
@@ -136,7 +185,7 @@ function handleDblClick() {
   }
 
   &__lunar {
-    font-size: 10px;
+    font-size: $calendar-cell-lunar-size;
     color: $color-text-tertiary;
     line-height: 1;
     white-space: nowrap;
@@ -157,16 +206,11 @@ function handleDblClick() {
       background: $color-primary-light;
     }
   }
+}
 
-  &__indicator {
-    position: absolute;
-    top: $space-2;
-    right: $space-2;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: $color-primary-light;
-    box-shadow: 0 0 6px rgba($color-primary-light, 0.5);
+@keyframes border-flow {
+  to {
+    --angle: 360deg;
   }
 }
 </style>

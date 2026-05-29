@@ -94,7 +94,11 @@ $z-toast: 500;
 $z-voice-overlay: 600;
 
 // Calendar
-$calendar-cell-min-height: 80px;
+$calendar-cell-min-height: 56px;
+$calendar-cell-day-size: 20px;
+$calendar-cell-lunar-size: 12px;
+$calendar-cell-jieqi-size: 13px;
+$calendar-today-circle-size: 28px;
 $calendar-toolbar-height: 56px;
 $calendar-bottom-toolbar-height: 64px;
 

@@ -8,7 +8,7 @@ export function useCalendar() {
   const now = new Date()
   const currentYear = ref(now.getFullYear())
   const currentMonth = ref(now.getMonth())
-  const selectedDate = ref<string>(`${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`)
+  const selectedDate = ref<string>(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`)
   const transitionDirection = ref<MonthDirection>('none')
   const isTransitioning = ref(false)
   const supportsViewTransition = typeof document !== 'undefined'
@@ -136,7 +136,7 @@ export function useCalendar() {
         isCurrentMonth = true
       }
 
-      const dateKey = `${cellYear}-${cellMonth + 1}-${cellDay}`
+      const dateKey = `${cellYear}-${String(cellMonth + 1).padStart(2, '0')}-${String(cellDay).padStart(2, '0')}`
       const isToday = dateKey === todayStr
       const date = new Date(cellYear, cellMonth, cellDay)
 

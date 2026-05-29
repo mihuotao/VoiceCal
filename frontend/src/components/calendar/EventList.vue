@@ -78,7 +78,8 @@ function formatDateLabel(dateKey: string) {
 
 .event-list {
   width: 100%;
-  padding: 0 $space-6 $space-4;
+  padding: 0;
+  flex: 1;
 }
 
 .event-list__header {

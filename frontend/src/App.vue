@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue'
+import { ref, shallowRef, onMounted, watch } from 'vue'
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
 import CalendarGrid from '@/components/calendar/CalendarGrid.vue'
 import BottomToolbar from '@/components/calendar/BottomToolbar.vue'
+import InlineToolbar from '@/components/calendar/InlineToolbar.vue'
 import InlineNote from '@/components/calendar/InlineNote.vue'
 import EventList from '@/components/calendar/EventList.vue'
 import EventForm from '@/components/calendar/EventForm.vue'
@@ -95,6 +96,13 @@ const conflicts = ref<CalendarEvent[]>([])
 onMounted(() => {
   fetchEvents()
   fetchPreferences()
+})
+
+watch(isAuthenticated, (auth) => {
+  if (auth) {
+    fetchEvents()
+    fetchPreferences()
+  }
 })
 
 function onToolbarSelect(id: string) {
@@ -256,28 +264,46 @@ function handleVoiceConfirm() {
     />
 
     <main class="calendar-body">
-      <div class="weekday-row">
-        <div v-for="w in weekdays" :key="w" class="weekday-cell">
-          {{ w }}
+      <div class="calendar-left">
+        <div class="weekday-row">
+          <div v-for="w in weekdays" :key="w" class="weekday-cell">
+            {{ w }}
+          </div>
         </div>
+
+        <CalendarGrid
+          :cells="calendarCells"
+          :selected-date="selectedDate"
+          :dates-with-events="datesWithEvents"
+          @select-date="selectDate"
+          @cell-dblclick="onCellDblclick"
+        />
       </div>
 
-      <CalendarGrid
-        :cells="calendarCells"
-        :selected-date="selectedDate"
-        :dates-with-events="datesWithEvents"
-        @select-date="selectDate"
-        @cell-dblclick="onCellDblclick"
-      />
+      <aside class="calendar-right">
+        <InlineToolbar
+          :active-id="toolbarActiveId"
+          @select="onToolbarSelect"
+        />
 
-      <FestivalCard :festival="getFestivalForDate(selectedDate)" />
+        <FestivalCard :festival="getFestivalForDate(selectedDate)" />
 
-      <EventList
-        :events="getEventsForDate(selectedDate)"
-        :selected-date="selectedDate"
-        @select="onSelectEvent"
-        @add="openNewEvent"
-      />
+        <EventList
+          :events="getEventsForDate(selectedDate)"
+          :selected-date="selectedDate"
+          @select="onSelectEvent"
+          @add="openNewEvent"
+        />
+
+        <div class="voice-center">
+          <VoiceButton
+            :status="status === 'listening' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
+            :amplitude="amplitude"
+            :size="80"
+            @click="openOverlay"
+          />
+        </div>
+      </aside>
     </main>
 
     <ConflictPanel
@@ -285,15 +311,6 @@ function handleVoiceConfirm() {
       @resolve="handleConflictResolve"
       @ignore="handleConflictIgnore"
     />
-
-    <div class="voice-center">
-      <VoiceButton
-        :status="status === 'listening' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
-        :amplitude="amplitude"
-        :size="80"
-        @click="openOverlay"
-      />
-    </div>
 
     <SearchPanel
       :open="searchOpen"
@@ -417,11 +434,31 @@ function handleVoiceConfirm() {
 .calendar-body {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: $space-4;
   padding: 0 $space-6 $space-2;
   position: relative;
   z-index: 1;
   overflow: hidden;
+}
+
+.calendar-left {
+  flex: 6;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.calendar-right {
+  flex: 4;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  overflow-y: auto;
+  padding-left: $space-4;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
 }
 
 .weekday-row {
@@ -433,8 +470,8 @@ function handleVoiceConfirm() {
 
 .weekday-cell {
   text-align: center;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-medium;
+  font-size: $font-size-base;
+  font-weight: $font-weight-bold;
   color: $color-text-tertiary;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -442,14 +479,11 @@ function handleVoiceConfirm() {
 }
 
 .voice-center {
-  position: absolute;
-  bottom: 72px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: $z-overlay;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: $space-4 0 $space-2;
+  margin-top: auto;
 }
 
 @keyframes orb-float-1 {
@@ -467,6 +501,5 @@ function handleVoiceConfirm() {
   0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.12; }
   50% { transform: translate(-20px, -50px) scale(1.15); opacity: 0.2; }
 }
-
 
 </style>

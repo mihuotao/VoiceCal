@@ -7,11 +7,11 @@ USE `voice_calendar`;
 
 -- ============================================================
 -- 1. 测试用户
--- 密码均为: 123456 (BCrypt 加密)
+-- 密码均为: 12345678 (BCrypt 加密)
 -- ============================================================
 INSERT INTO `user` (`username`, `password`, `nickname`, `email`, `phone`, `status`) VALUES
-('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '管理员', 'admin@voicecal.com', '13800000001', 1),
-('test',  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户', 'test@voicecal.com',  '13800000002', 1);
+('admin', '$2a$10$m02/AGKU3osn7Z0cpl9Ec.rhrMVCam.nLA7zW8pN0XTDycNRSoAVa', '管理员', 'admin@voicecal.com', '13800000001', 1),
+('test',  '$2a$10$m02/AGKU3osn7Z0cpl9Ec.rhrMVCam.nLA7zW8pN0XTDycNRSoAVa', '测试用户', 'test@voicecal.com',  '13800000002', 1);
 
 -- ============================================================
 -- 2. 用户偏好设置
