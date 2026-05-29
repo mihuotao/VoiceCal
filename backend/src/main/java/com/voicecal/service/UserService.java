@@ -2,6 +2,8 @@ package com.voicecal.service;
 
 import com.voicecal.entity.User;
 
+import java.util.List;
+
 public interface UserService {
 
     User getById(Long id);
@@ -21,5 +23,7 @@ public interface UserService {
     void updateUser(Long userId, String nickname, String email, String phone, String avatar);
 
     void changePassword(Long userId, String oldPassword, String newPassword);
+
+    List<User> listAll();
 
 }

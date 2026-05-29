@@ -8,6 +8,7 @@ import com.voicecal.service.UserService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -82,6 +83,11 @@ public class UserServiceImpl implements UserService {
         user.setPhone(phone);
         user.setAvatar(avatar);
         userMapper.updateById(user);
+    }
+
+    @Override
+    public List<User> listAll() {
+        return userMapper.selectList(null);
     }
 
     @Override
