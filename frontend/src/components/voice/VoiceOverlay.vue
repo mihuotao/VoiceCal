@@ -1,29 +1,51 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import { motion } from 'motion-v'
 import { springPresets } from '@/composables/useMotion'
 import VoiceOrbCanvas from '@/components/voice/VoiceOrbCanvas.vue'
 import VoiceWaveform from '@/components/voice/VoiceWaveform.vue'
-import type { VoiceStatus } from '@/composables/useVoice'
+import VoiceResult from '@/components/voice/VoiceResult.vue'
+import type { VoiceStatus, ParsedIntent } from '@/types/voice'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   status?: VoiceStatus
   amplitude?: number
+  transcript?: string
+  intent?: ParsedIntent | null
 }>(), {
   status: 'idle',
-  amplitude: 0
+  amplitude: 0,
+  transcript: '',
+  intent: null
 })
 
 const emit = defineEmits<{
   close: []
-  confirm: []
+  confirmCreate: []
+  retry: []
+  editResult: []
+  startRecord: []
+  stopRecord: []
 }>()
 
-const statusText: Record<VoiceStatus, string> = {
-  idle: '',
-  listening: '正在聆听...',
-  processing: '处理中...',
-  result: '识别结果'
+watch(() => props.open, (v) => {
+  if (v && props.status === 'listening') {
+    emit('startRecord')
+  }
+})
+
+function handleConfirm() {
+  if (props.status === 'recording') {
+    emit('stopRecord')
+  }
+}
+
+function handleClose() {
+  if (props.status === 'recording') {
+    emit('stopRecord')
+  }
+  emit('close')
 }
 </script>
 
@@ -43,7 +65,7 @@ const statusText: Record<VoiceStatus, string> = {
         :animate="{ opacity: 1 }"
         :exit="{ opacity: 0 }"
         :transition="{ duration: 0.25 }"
-        @click="emit('close')"
+        @click="handleClose"
       />
 
       <motion.div
@@ -54,7 +76,7 @@ const statusText: Record<VoiceStatus, string> = {
         :transition="springPresets.slide"
       >
         <div class="voice-overlay__header">
-          <button class="voice-overlay__close" @click="emit('close')">
+          <button class="voice-overlay__close" @click="handleClose">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -62,10 +84,21 @@ const statusText: Record<VoiceStatus, string> = {
           </button>
         </div>
 
-        <div class="voice-overlay__content">
+        <div v-if="status === 'result'" class="voice-overlay__content voice-overlay__content--result">
+          <VoiceResult
+            :transcript="transcript"
+            :intent="intent"
+            @confirm="emit('confirmCreate')"
+            @edit="emit('editResult')"
+            @retry="emit('retry')"
+            @close="handleClose"
+          />
+        </div>
+
+        <div v-else class="voice-overlay__content">
           <div class="voice-overlay__orb">
             <VoiceOrbCanvas
-              :status="status === 'listening' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
+              :status="status === 'recording' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
               :amplitude="amplitude"
               :size="140"
             />
@@ -74,13 +107,14 @@ const statusText: Record<VoiceStatus, string> = {
           <div class="voice-overlay__waveform">
             <VoiceWaveform
               :amplitude="amplitude"
-              :is-active="status === 'listening'"
+              :is-active="status === 'listening' || status === 'recording'"
               :height="60"
             />
           </div>
 
           <div class="voice-overlay__status">
-            <span v-if="status === 'listening'" class="voice-overlay__dots">
+            <span v-if="status === 'listening'" class="voice-overlay__hint">点击下方按钮开始录音</span>
+            <span v-else-if="status === 'recording'" class="voice-overlay__dots">
               正在聆听
               <span class="dot">.</span>
               <span class="dot">.</span>
@@ -90,30 +124,45 @@ const statusText: Record<VoiceStatus, string> = {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="voice-spinner">
                 <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10" />
               </svg>
-              处理中
+              识别中
             </span>
-            <span v-else>{{ statusText[status] }}</span>
           </div>
         </div>
 
-        <div class="voice-overlay__footer">
+        <div v-if="status !== 'result'" class="voice-overlay__footer">
           <motion.button
             class="voice-overlay__action voice-overlay__action--cancel"
             :while-hover="{ scale: 1.04 }"
             :while-tap="{ scale: 0.97 }"
             :transition="springPresets.snappy"
-            @click="emit('close')"
+            @click="handleClose"
           >
             取消
           </motion.button>
           <motion.button
             v-if="status === 'listening'"
+            class="voice-overlay__action voice-overlay__action--record"
+            :while-hover="{ scale: 1.06 }"
+            :while-tap="{ scale: 0.94 }"
+            :transition="springPresets.snappy"
+            @click="emit('startRecord')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="6" />
+            </svg>
+            开始录音
+          </motion.button>
+          <motion.button
+            v-if="status === 'recording'"
             class="voice-overlay__action voice-overlay__action--done"
             :while-hover="{ scale: 1.04 }"
             :while-tap="{ scale: 0.97 }"
             :transition="springPresets.snappy"
-            @click="emit('confirm')"
+            @click="handleConfirm"
           >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
             完成
           </motion.button>
         </div>
@@ -187,6 +236,10 @@ const statusText: Record<VoiceStatus, string> = {
   align-items: center;
   gap: $space-6;
   flex: 1;
+
+  &--result {
+    gap: $space-4;
+  }
 }
 
 .voice-overlay__orb {
@@ -205,6 +258,11 @@ const statusText: Record<VoiceStatus, string> = {
   color: $color-text-secondary;
   text-align: center;
   min-height: 1.5em;
+}
+
+.voice-overlay__hint {
+  font-size: $font-size-base;
+  color: $color-text-tertiary;
 }
 
 .voice-overlay__dots {
@@ -233,7 +291,10 @@ const statusText: Record<VoiceStatus, string> = {
 }
 
 .voice-overlay__action {
-  padding: $space-2 $space-8;
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-2 $space-6;
   border-radius: $radius-full;
   font-size: $font-size-base;
   font-family: $font-family;
@@ -257,14 +318,25 @@ const statusText: Record<VoiceStatus, string> = {
     }
   }
 
-  &--done {
-    background: rgba($color-primary, 0.25);
+  &--record {
+    background: rgba($color-primary, 0.2);
     border-color: rgba($color-primary, 0.3);
-    color: white;
+    color: $color-primary-light;
 
     &:hover {
-      background: rgba($color-primary, 0.35);
-      box-shadow: 0 0 16px rgba($color-primary, 0.25);
+      background: rgba($color-primary, 0.3);
+      box-shadow: 0 0 16px rgba($color-primary, 0.2);
+    }
+  }
+
+  &--done {
+    background: rgba($color-success, 0.2);
+    border-color: rgba($color-success, 0.3);
+    color: $color-success;
+
+    &:hover {
+      background: rgba($color-success, 0.3);
+      box-shadow: 0 0 16px rgba($color-success, 0.2);
     }
   }
 }

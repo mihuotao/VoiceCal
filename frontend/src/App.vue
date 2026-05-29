@@ -27,8 +27,12 @@ const {
   status,
   amplitude,
   isOverlayOpen,
+  transcript,
+  parsedIntent,
   openOverlay,
-  closeOverlay
+  closeOverlay,
+  startRecording,
+  stopRecording
 } = useVoice()
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
@@ -110,8 +114,14 @@ function formatDateLabel(dateKey: string) {
       :open="isOverlayOpen"
       :status="status"
       :amplitude="amplitude"
+      :transcript="transcript"
+      :intent="parsedIntent"
       @close="closeOverlay"
-      @confirm="closeOverlay"
+      @confirm-create="closeOverlay"
+      @start-record="startRecording"
+      @stop-record="stopRecording"
+      @retry="startRecording"
+      @edit-result="closeOverlay"
     />
 
     <BottomToolbar
