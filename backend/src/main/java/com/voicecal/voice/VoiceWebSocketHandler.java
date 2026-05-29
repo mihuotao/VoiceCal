@@ -19,16 +19,24 @@ public class VoiceWebSocketHandler extends TextWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(VoiceWebSocketHandler.class);
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
+    private final BaiduAsrService asrService;
+    private final VoiceNluService nluService;
+    private final VoiceCommandService voiceCommandService;
 
-    public VoiceWebSocketHandler(ObjectMapper objectMapper) {
+    public VoiceWebSocketHandler(ObjectMapper objectMapper,
+                                  BaiduAsrService asrService,
+                                  VoiceNluService nluService,
+                                  VoiceCommandService voiceCommandService) {
         this.objectMapper = objectMapper;
+        this.asrService = asrService;
+        this.nluService = nluService;
+        this.voiceCommandService = voiceCommandService;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        String userId = extractUserId(session);
         sessions.put(session.getId(), session);
-        log.info("WebSocket 连接建立: sessionId={}, userId={}", session.getId(), userId);
+        log.info("WebSocket 连接建立: sessionId={}", session.getId());
     }
 
     @Override
@@ -37,16 +45,10 @@ public class VoiceWebSocketHandler extends TextWebSocketHandler {
         String type = json.get("type").asText();
 
         switch (type) {
-            case "ping" -> {
-                session.sendMessage(new TextMessage("{\"type\":\"pong\"}"));
-            }
-            case "audio_data" -> {
-                handleAudioData(session, json);
-            }
-            default -> {
-                session.sendMessage(new TextMessage(
-                        "{\"type\":\"error\",\"payload\":{\"message\":\"未知消息类型\"}}"));
-            }
+            case "ping" -> session.sendMessage(new TextMessage("{\"type\":\"pong\"}"));
+            case "audio_data" -> handleAudioData(session, json);
+            default -> session.sendMessage(new TextMessage(
+                    "{\"type\":\"error\",\"payload\":{\"message\":\"未知消息类型\"}}"));
         }
     }
 
@@ -56,17 +58,32 @@ public class VoiceWebSocketHandler extends TextWebSocketHandler {
         String format = json.get("payload").get("format").asText("pcm");
         int sampleRate = json.get("payload").get("sampleRate").asInt(16000);
 
-        // TODO: Step 10 中将集成 BaiduAsrService 进行识别
-        String resultJson = """
-                {
-                    "type": "final_result",
-                    "sessionId": "%s",
-                    "payload": {
-                        "text": "（语音识别待集成）",
-                        "isFinal": true
-                    }
-                }
-                """.formatted(sessionId);
+        session.sendMessage(new TextMessage(String.format(
+                "{\"type\":\"intermediate_result\",\"sessionId\":\"%s\",\"payload\":{\"text\":\"识别中...\",\"isFinal\":false}}",
+                sessionId)));
+
+        BaiduAsrService.AsrResult asrResult = asrService.recognize(audioBase64, format, sampleRate);
+
+        if (!asrResult.isSuccess()) {
+            session.sendMessage(new TextMessage(String.format(
+                    "{\"type\":\"error\",\"sessionId\":\"%s\",\"payload\":{\"message\":\"语音识别失败: %s\"}}",
+                    sessionId, asrResult.getError())));
+            return;
+        }
+
+        String recognizedText = asrResult.getText();
+        session.sendMessage(new TextMessage(String.format(
+                "{\"type\":\"intermediate_result\",\"sessionId\":\"%s\",\"payload\":{\"text\":\"%s\",\"isFinal\":true}}",
+                sessionId, recognizedText)));
+
+        // TODO: get userId from session token
+        Long userId = 1L;
+        Map<String, Object> commandResult = voiceCommandService.processTextCommand(userId, recognizedText);
+
+        String resultJson = objectMapper.writeValueAsString(Map.of(
+                "type", "final_result",
+                "sessionId", sessionId,
+                "payload", commandResult));
 
         session.sendMessage(new TextMessage(resultJson));
     }
@@ -80,19 +97,6 @@ public class VoiceWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         log.error("WebSocket 传输错误: sessionId={}", session.getId(), exception);
-    }
-
-    private String extractUserId(WebSocketSession session) {
-        String query = session.getUri().getQuery();
-        if (query != null) {
-            for (String param : query.split("&")) {
-                String[] parts = param.split("=", 2);
-                if ("token".equals(parts[0]) && parts.length > 1) {
-                    return parts[1];
-                }
-            }
-        }
-        return "unknown";
     }
 
 }
