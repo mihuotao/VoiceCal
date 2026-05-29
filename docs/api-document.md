@@ -1295,6 +1295,7 @@ Authorization: Bearer <token>
 | GET       | /users/me                                     | 获取当前用户       |
 | PATCH     | /users/me                                     | 更新当前用户       |
 | PATCH     | /users/me/password                            | 修改密码           |
+| GET       | /users                                        | 用户列表（管理员）  |
 | GET       | /preferences                                  | 获取偏好设置       |
 | PATCH     | /preferences                                  | 更新偏好设置       |
 | POST      | /events                                       | 创建事件           |
@@ -1322,13 +1323,10 @@ Authorization: Bearer <token>
 | GET       | /festivals/month                              | 当月节日           |
 | GET       | /festivals/year                               | 年度节日           |
 | WS        | /ws/voice                                     | 语音命令 WebSocket |
+| POST      | /voice/command                                | 文本语音命令       |
+| POST      | /voice/festival-greeting                      | 节日关怀播报       |
 | GET       | /voice-logs                                   | 语音命令日志       |
 | POST      | /voice/tts                                    | 文本转语音         |
 | POST      | /voice/asr                                    | 语音转文本         |
-| POST      | /voice/festival-greeting                      | 节日关怀播报       |
 | GET       | /audit-logs                                   | 审计日志           |
-| POST      | /auth/refresh                                 | 刷新 Token         |
-| POST      | /auth/logout                                  | 退出登录           |
-| GET       | /preferences                                  | 获取偏好设置       |
-| PATCH     | /preferences                                  | 更新偏好设置       |
-| PATCH     | /preferences/reset                            | 重置偏好设置       |
+
