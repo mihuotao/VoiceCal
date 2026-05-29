@@ -107,6 +107,10 @@ public class ApiResult<T> {
         return error(ResultCode.NOT_FOUND.getCode(), message);
     }
 
+    public static <T> ApiResult<T> unprocessableEntity(String message) {
+        return error(ResultCode.UNPROCESSABLE_ENTITY.getCode(), message);
+    }
+
     public static <T> ApiResult<T> conflict(String message) {
         return error(ResultCode.CONFLICT.getCode(), message);
     }
