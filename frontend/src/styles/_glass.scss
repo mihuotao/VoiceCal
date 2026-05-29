@@ -1,0 +1,75 @@
+@use 'variables' as *;
+
+@mixin glass-base($blur: $glass-default-blur, $opacity: $glass-default-opacity, $saturate: $glass-default-saturate) {
+  background: rgba(255, 255, 255, $opacity * 0.1);
+  backdrop-filter: blur($blur) saturate($saturate);
+  -webkit-backdrop-filter: blur($blur) saturate($saturate);
+  border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity);
+}
+
+@mixin glass-surface($blur: $glass-default-blur, $opacity: $glass-default-opacity) {
+  background: rgba(255, 255, 255, $opacity * 0.12);
+  backdrop-filter: blur($blur);
+  -webkit-backdrop-filter: blur($blur);
+  border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity);
+}
+
+@mixin glass-raised($blur: $glass-default-blur, $opacity: $glass-default-opacity) {
+  background: rgba(255, 255, 255, $opacity * 0.18);
+  backdrop-filter: blur($blur);
+  -webkit-backdrop-filter: blur($blur);
+  border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity * 1.5);
+  box-shadow: $shadow-md;
+}
+
+@mixin glass-strong($blur: $glass-default-blur, $opacity: 0.85) {
+  background: rgba(255, 255, 255, $opacity * 0.22);
+  backdrop-filter: blur($blur) saturate(1.6);
+  -webkit-backdrop-filter: blur($blur) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, $glass-default-border-opacity * 2);
+  box-shadow: $shadow-lg;
+}
+
+@mixin glass-button {
+  @include glass-surface;
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: all $transition-base;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  &:hover {
+    @include glass-raised;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+@mixin glass-input {
+  @include glass-surface;
+  border-radius: $radius-md;
+  color: $color-text-primary;
+  font-family: $font-family;
+  font-size: $font-size-base;
+  transition: all $transition-base;
+  outline: none;
+
+  &::placeholder {
+    color: $color-text-tertiary;
+  }
+
+  &:focus {
+    @include glass-raised;
+    border-color: rgba($color-primary, 0.5);
+    box-shadow: 0 0 0 3px rgba($color-primary, 0.15);
+  }
+}

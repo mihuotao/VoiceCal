@@ -1,0 +1,61 @@
+@use 'variables' as *;
+@use 'glass';
+@use 'animations';
+@use 'reset';
+
+:root {
+  --glass-blur: #{$glass-default-blur};
+  --glass-opacity: #{$glass-default-opacity};
+  --glass-saturate: #{$glass-default-saturate};
+  --glass-border-opacity: #{$glass-default-border-opacity};
+  --color-primary: #{$color-primary};
+  --color-primary-light: #{$color-primary-light};
+  --color-primary-dark: #{$color-primary-dark};
+  --color-text-primary: #{$color-text-primary};
+  --color-text-secondary: #{$color-text-secondary};
+  --color-text-tertiary: #{$color-text-tertiary};
+  --bg-gradient: #{$bg-default-gradient};
+  --bg-color: #{$bg-default-color};
+}
+
+body {
+  background: var(--bg-gradient);
+  background-color: var(--bg-color);
+  color: var(--color-text-primary);
+  font-family: $font-family;
+  font-size: $font-size-base;
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+::selection {
+  background: rgba($color-primary, 0.3);
+  color: white;
+}
+
+@view-transition {
+  navigation: auto;
+}

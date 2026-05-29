@@ -1,0 +1,30 @@
+node_modules/
+dist/
+dev-dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend
+backend/target/
+backend/*.jar
+backend/*.war
+backend/logs/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temp
+.claude/
