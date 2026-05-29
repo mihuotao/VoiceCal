@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   selectDate: [dateKey: string]
+  cellDblclick: [dateKey: string]
 }>()
 
 const rows = computed(() => {
@@ -34,6 +35,7 @@ const rows = computed(() => {
         :cell="cell"
         :is-selected="cell.dateKey === selectedDate"
         @select="emit('selectDate', $event)"
+        @dblclick="emit('cellDblclick', $event)"
       />
     </div>
   </div>

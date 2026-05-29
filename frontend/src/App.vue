@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { ref, shallowRef } from 'vue'
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
 import CalendarGrid from '@/components/calendar/CalendarGrid.vue'
+import BottomToolbar from '@/components/calendar/BottomToolbar.vue'
+import InlineNote from '@/components/calendar/InlineNote.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import { useCalendar } from '@/composables/useCalendar'
@@ -29,6 +32,35 @@ const {
 } = useVoice()
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+
+const toolbarActiveId = ref('month')
+const noteDateKey = shallowRef('')
+const noteText = ref('')
+const noteOpen = ref(false)
+const notes = ref<Record<string, string>>({})
+
+function onToolbarSelect(id: string) {
+  toolbarActiveId.value = id
+}
+
+function onCellDblclick(dateKey: string) {
+  noteDateKey.value = dateKey
+  noteText.value = notes.value[dateKey] ?? ''
+  noteOpen.value = true
+}
+
+function onNoteSave(dateKey: string, text: string) {
+  if (text.trim()) {
+    notes.value[dateKey] = text.trim()
+  } else {
+    delete notes.value[dateKey]
+  }
+}
+
+function formatDateLabel(dateKey: string) {
+  const [y, m, d] = dateKey.split('-')
+  return `${y}年${parseInt(m)}月${parseInt(d)}日`
+}
 </script>
 
 <template>
@@ -61,6 +93,7 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
         :cells="calendarCells"
         :selected-date="selectedDate"
         @select-date="selectDate"
+        @cell-dblclick="onCellDblclick"
       />
     </main>
 
@@ -81,11 +114,20 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
       @confirm="closeOverlay"
     />
 
-    <footer class="bottom-toolbar">
-      <div class="toolbar-placeholder">
-        <span>底部工具栏将在 Step 6 构建</span>
-      </div>
-    </footer>
+    <BottomToolbar
+      :active-id="toolbarActiveId"
+      @select="onToolbarSelect"
+    />
+
+    <InlineNote
+      :open="noteOpen"
+      :date-key="noteDateKey"
+      :date-label="formatDateLabel(noteDateKey)"
+      :model-value="noteText"
+      @update:model-value="noteText = $event"
+      @save="onNoteSave"
+      @close="noteOpen = false"
+    />
   </div>
 </template>
 
@@ -179,22 +221,6 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.bottom-toolbar {
-  height: $calendar-bottom-toolbar-height;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  z-index: 1;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.toolbar-placeholder {
-  font-size: $font-size-xs;
-  color: $color-text-tertiary;
-  opacity: 0.4;
 }
 
 @keyframes orb-float-1 {

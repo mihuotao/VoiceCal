@@ -14,10 +14,15 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   select: [dateKey: string]
+  dblclick: [dateKey: string]
 }>()
 
 function handleClick() {
   emit('select', props.cell.dateKey)
+}
+
+function handleDblClick() {
+  emit('dblclick', props.cell.dateKey)
 }
 </script>
 
@@ -36,6 +41,7 @@ function handleClick() {
     :transition="springPresets.gentle"
     :layout="true"
     @click="handleClick"
+    @dblclick.prevent="handleDblClick"
   >
     <div class="calendar-cell__top">
       <span class="calendar-cell__day">{{ cell.day }}</span>
