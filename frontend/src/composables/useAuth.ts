@@ -49,6 +49,10 @@ function clearAuth() {
 
 loadFromStorage()
 
+window.addEventListener('auth:unauthorized', () => {
+  clearAuth()
+})
+
 export function useAuth() {
   async function login(req: LoginRequest) {
     state.value.loading = true

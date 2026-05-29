@@ -21,7 +21,7 @@ instance.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('voicecal_token')
       localStorage.removeItem('voicecal_user')
-      window.location.reload()
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
     }
     return Promise.reject(error)
   }
