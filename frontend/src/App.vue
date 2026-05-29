@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
-import VoiceOrbCanvas from '@/components/voice/VoiceOrbCanvas.vue'
+import VoiceButton from '@/components/voice/VoiceButton.vue'
+import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import { useCalendar } from '@/composables/useCalendar'
+import { useVoice } from '@/composables/useVoice'
 
 const {
   monthYearLabel,
@@ -13,6 +15,14 @@ const {
   prevMonth,
   goToToday
 } = useCalendar()
+
+const {
+  status,
+  amplitude,
+  isOverlayOpen,
+  openOverlay,
+  closeOverlay
+} = useVoice()
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 </script>
@@ -59,11 +69,21 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     </main>
 
     <div class="voice-center">
-      <VoiceOrbCanvas
-        status="idle"
-        :size="100"
+      <VoiceButton
+        :status="status === 'listening' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
+        :amplitude="amplitude"
+        :size="80"
+        @click="openOverlay"
       />
     </div>
+
+    <VoiceOverlay
+      :open="isOverlayOpen"
+      :status="status"
+      :amplitude="amplitude"
+      @close="closeOverlay"
+      @confirm="closeOverlay"
+    />
 
     <footer class="bottom-toolbar">
       <div class="toolbar-placeholder">
