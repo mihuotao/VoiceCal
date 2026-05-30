@@ -10,6 +10,7 @@ import EventForm from '@/components/calendar/EventForm.vue'
 import EventDetail from '@/components/calendar/EventDetail.vue'
 import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
 import FestivalCard from '@/components/calendar/FestivalCard.vue'
+import FestivalDetail from '@/components/calendar/FestivalDetail.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import QueryResultPanel from '@/components/voice/QueryResultPanel.vue'
@@ -92,6 +93,10 @@ const queryResultOpen = ref(false)
 const queryEvents = ref<CalendarEvent[]>([])
 const queryDate = ref('')
 const queryResponseText = ref('')
+
+// 节日详情弹窗状态
+const festivalDetailOpen = ref(false)
+const selectedFestival = ref<any>(null)
 
 onMounted(() => {
   fetchEvents()
@@ -260,6 +265,14 @@ function handleVoiceConfirm() {
     speak(`好的，已为你创建日程：${intent.title}`)
   }
 }
+
+function handleFestivalClick() {
+  const festival = getFestivalForDate(selectedDate.value)
+  if (festival) {
+    selectedFestival.value = festival
+    festivalDetailOpen.value = true
+  }
+}
 </script>
 
 <template>
@@ -312,7 +325,10 @@ function handleVoiceConfirm() {
           @select="onToolbarSelect"
         />
 
-        <FestivalCard :festival="getFestivalForDate(selectedDate)" />
+        <FestivalCard
+          :festival="getFestivalForDate(selectedDate)"
+          @click="handleFestivalClick"
+        />
 
         <div class="right-date-section">
           <div class="right-date-header">
@@ -391,6 +407,12 @@ function handleVoiceConfirm() {
       :events="queryEvents"
       :response-text="queryResponseText"
       @close="queryResultOpen = false"
+    />
+
+    <FestivalDetail
+      :open="festivalDetailOpen"
+      :festival="selectedFestival"
+      @close="festivalDetailOpen = false"
     />
 
     <EventForm

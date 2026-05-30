@@ -8,6 +8,10 @@ const props = defineProps<{
   festival: FestivalInfo | null
 }>()
 
+defineEmits<{
+  click: []
+}>()
+
 const show = computed(() => props.festival !== null)
 </script>
 
@@ -19,6 +23,7 @@ const show = computed(() => props.festival !== null)
     :animate="{ opacity: 1, y: 0, scale: 1 }"
     :exit="{ opacity: 0, y: -8, scale: 0.97 }"
     :transition="springPresets.gentle"
+    @click="$emit('click')"
   >
     <div class="festival-emoji">{{ festival!.emoji }}</div>
     <div class="festival-info">
@@ -44,6 +49,13 @@ const show = computed(() => props.festival !== null)
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: $radius-lg;
   margin: $space-2 0;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+  }
 }
 
 .festival-emoji {
