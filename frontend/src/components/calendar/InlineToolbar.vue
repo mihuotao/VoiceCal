@@ -13,7 +13,7 @@ const emit = defineEmits<{
 const buttons = [
   { id: 'new', label: '新建', icon: '➕' },
   { id: 'settings', label: '设置', icon: '⚙️' },
-  { id: 'profile', label: '头像', icon: '👤' }
+  { id: 'profile', label: '我的', icon: '👤' }
 ]
 </script>
 

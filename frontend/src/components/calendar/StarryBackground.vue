@@ -116,7 +116,7 @@ onMounted(() => {
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #050510 0%, #0a0a2e 30%, #0f0c29 60%, #1a0a2e 100%);
+  background: linear-gradient(180deg, #0d1117 0%, #161b22 40%, #1c2333 70%, #0d1117 100%);
 }
 
 .custom-bg {
@@ -181,34 +181,34 @@ onMounted(() => {
 .nebula {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.08;
+  filter: blur(100px);
+  opacity: 0.04;
 
   &--1 {
-    width: 500px;
-    height: 500px;
+    width: 600px;
+    height: 600px;
     background: radial-gradient(circle, #6366f1, transparent);
     top: 10%;
     right: 10%;
-    animation: nebula-drift 20s ease-in-out infinite;
+    animation: nebula-drift 25s ease-in-out infinite;
   }
 
   &--2 {
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(circle, #ec4899, transparent);
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #818cf8, transparent);
     bottom: 20%;
     left: 5%;
-    animation: nebula-drift 25s ease-in-out infinite reverse;
+    animation: nebula-drift 30s ease-in-out infinite reverse;
   }
 
   &--3 {
-    width: 350px;
-    height: 350px;
-    background: radial-gradient(circle, #06b6d4, transparent);
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, #a5b4fc, transparent);
     top: 50%;
     left: 40%;
-    animation: nebula-drift 18s ease-in-out infinite;
+    animation: nebula-drift 22s ease-in-out infinite;
   }
 }
 

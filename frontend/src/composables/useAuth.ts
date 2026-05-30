@@ -117,6 +117,32 @@ export function useAuth() {
     state.value.error = null
   }
 
+  // 头像本地存储
+  const AVATAR_KEY = 'voicecal_avatar'
+
+  function loadAvatar(): string {
+    return localStorage.getItem(AVATAR_KEY) || ''
+  }
+
+  function saveAvatar(base64: string) {
+    localStorage.setItem(AVATAR_KEY, base64)
+    if (state.value.user) {
+      state.value.user = { ...state.value.user, avatar: base64 }
+    }
+  }
+
+  async function changePassword(oldPassword: string, newPassword: string) {
+    try {
+      const res = await request.patch<ApiResponse<void>>('/users/me/password', { oldPassword, newPassword })
+      if (res.code === 200) {
+        return { success: true }
+      }
+      return { success: false, message: res.message || '修改失败' }
+    } catch (e: any) {
+      return { success: false, message: e.response?.data?.message || '网络错误' }
+    }
+  }
+
   return {
     state: computed(() => state.value),
     isAuthenticated: computed(() => state.value.isAuthenticated),
@@ -127,6 +153,9 @@ export function useAuth() {
     login,
     register,
     logout,
-    clearError
+    clearError,
+    loadAvatar,
+    saveAvatar,
+    changePassword
   }
 }

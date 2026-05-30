@@ -29,9 +29,9 @@ $color-text-secondary: rgba(255, 255, 255, 0.6);
 $color-text-tertiary: rgba(255, 255, 255, 0.38);
 $color-text-inverse: #1a1a2e;
 
-// Background
-$bg-default-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-$bg-default-color: #0f0c29;
+// Background — Softer deep blue-gray
+$bg-default-gradient: linear-gradient(135deg, #0d1117, #161b22, #1c2333);
+$bg-default-color: #0d1117;
 
 // Spacing
 $space-1: 4px;
@@ -45,24 +45,26 @@ $space-10: 40px;
 $space-12: 48px;
 $space-16: 64px;
 
-// Typography
-$font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+// Typography — Refined Clarity
+$font-family: 'DM Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+$font-family-display: 'Outfit', 'Noto Sans SC', sans-serif;
 $font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
-$font-size-xs: 13px;
-$font-size-sm: 15px;
-$font-size-base: 16px;
-$font-size-lg: 18px;
-$font-size-xl: 22px;
-$font-size-2xl: 28px;
-$font-size-3xl: 36px;
-$font-size-4xl: 44px;
+$font-size-xs: 12px;
+$font-size-sm: 14px;
+$font-size-base: 15px;
+$font-size-lg: 17px;
+$font-size-xl: 20px;
+$font-size-2xl: 26px;
+$font-size-3xl: 32px;
+$font-size-4xl: 40px;
+$font-weight-light: 300;
 $font-weight-normal: 400;
 $font-weight-medium: 500;
 $font-weight-semibold: 600;
 $font-weight-bold: 700;
-$line-height-tight: 1.2;
-$line-height-base: 1.5;
-$line-height-relaxed: 1.7;
+$line-height-tight: 1.25;
+$line-height-base: 1.6;
+$line-height-relaxed: 1.75;
 
 // Border radius
 $radius-sm: 8px;

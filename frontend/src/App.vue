@@ -22,6 +22,7 @@ import { useFestival } from '@/composables/useFestival'
 import { useTts } from '@/composables/useTts'
 import LoginPage from '@/components/auth/LoginPage.vue'
 import SettingsPanel from '@/components/settings/SettingsPanel.vue'
+import ProfilePanel from '@/components/profile/ProfilePanel.vue'
 import type { CalendarEvent } from '@/types/event'
 
 const {
@@ -62,11 +63,12 @@ const {
   checkConflicts
 } = useEvents()
 
-const { isAuthenticated, logout } = useAuth()
+const { isAuthenticated } = useAuth()
 const { fetchPreferences } = usePreferences()
 const { getFestivalForDate } = useFestival()
 const { speak } = useTts()
 const settingsOpen = ref(false)
+const profileOpen = ref(false)
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 const todayWeekday = new Date().getDay()
@@ -108,7 +110,7 @@ function onToolbarSelect(id: string) {
   if (id === 'settings') {
     settingsOpen.value = !settingsOpen.value
   } else if (id === 'profile') {
-    logout()
+    profileOpen.value = !profileOpen.value
   } else if (id === 'new') {
     openNewEvent(selectedDate.value)
   }
@@ -362,6 +364,11 @@ function handleVoiceConfirm() {
       @close="settingsOpen = false"
     />
 
+    <ProfilePanel
+      :open="profileOpen"
+      @close="profileOpen = false"
+    />
+
     <VoiceOverlay
       :open="isOverlayOpen"
       :status="status"
@@ -478,28 +485,28 @@ function handleVoiceConfirm() {
 .weekday-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: $space-1 $space-1;
+  padding: $space-1;
   margin-bottom: $space-1;
-  background: linear-gradient(135deg, #1a1a3e, #2d2b6b);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: $radius-md;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .weekday-cell {
   text-align: center;
-  font-size: $font-size-base;
-  font-weight: $font-weight-bold;
-  color: #c7d2fe;
-  letter-spacing: 0.08em;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-text-tertiary;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: $space-2 0;
   border-radius: $radius-sm;
   transition: background $transition-fast, color $transition-fast;
 
   &--today {
-    color: white;
-    background: rgba($color-primary, 0.3);
-    font-weight: $font-weight-bold;
+    color: $color-primary-light;
+    background: rgba($color-primary, 0.15);
+    font-weight: $font-weight-semibold;
   }
 }
 
@@ -529,26 +536,27 @@ function handleVoiceConfirm() {
 }
 
 .right-date-day {
-  font-size: 40px;
-  font-weight: $font-weight-bold;
+  font-size: 36px;
+  font-weight: $font-weight-light;
   color: white;
   line-height: 1;
+  font-family: $font-family-display;
 }
 
 .right-date-info {
   display: flex;
   flex-direction: column;
-  gap: $space-1;
+  gap: 2px;
 }
 
 .right-date-weekday {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
   color: $color-text-primary;
 }
 
 .right-date-full {
-  font-size: $font-size-sm;
+  font-size: $font-size-xs;
   color: $color-text-tertiary;
 }
 
