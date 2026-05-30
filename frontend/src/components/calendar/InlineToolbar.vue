@@ -12,8 +12,6 @@ const emit = defineEmits<{
 
 const buttons = [
   { id: 'new', label: '新建', icon: '➕' },
-  { id: 'month', label: '月', icon: '📅' },
-  { id: 'search', label: '搜索', icon: '🔍' },
   { id: 'settings', label: '设置', icon: '⚙️' },
   { id: 'profile', label: '头像', icon: '👤' }
 ]
@@ -42,7 +40,7 @@ const buttons = [
 
 .inline-toolbar {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: $space-1;
   padding: $space-2;
   background: rgba(255, 255, 255, 0.04);

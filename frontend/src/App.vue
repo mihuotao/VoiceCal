@@ -10,13 +10,11 @@ import EventForm from '@/components/calendar/EventForm.vue'
 import EventDetail from '@/components/calendar/EventDetail.vue'
 import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
 import FestivalCard from '@/components/calendar/FestivalCard.vue'
-import SearchPanel from '@/components/search/SearchPanel.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
 import { useCalendar } from '@/composables/useCalendar'
 import { useVoice } from '@/composables/useVoice'
 import { useEvents } from '@/composables/useEvents'
-import { useSearch } from '@/composables/useSearch'
 import { useAuth } from '@/composables/useAuth'
 import { usePreferences } from '@/composables/usePreferences'
 import { useFestival } from '@/composables/useFestival'
@@ -24,7 +22,6 @@ import { useTts } from '@/composables/useTts'
 import LoginPage from '@/components/auth/LoginPage.vue'
 import SettingsPanel from '@/components/settings/SettingsPanel.vue'
 import type { CalendarEvent } from '@/types/event'
-import type { SearchResultItem } from '@/types/search'
 
 const {
   monthYearLabel,
@@ -63,14 +60,6 @@ const {
   checkConflicts
 } = useEvents()
 
-const s = useSearch()
-const searchResults = s.results
-const searchSummary = s.summary
-const searchQueryText = s.searchQuery
-const isSearching = s.isSearching
-const search = s.search
-const clearSearch = s.clearSearch
-
 const { isAuthenticated, logout } = useAuth()
 const { fetchPreferences } = usePreferences()
 const { getFestivalForDate } = useFestival()
@@ -81,7 +70,6 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 const todayWeekday = new Date().getDay()
 
 const toolbarActiveId = ref('month')
-const searchOpen = ref(false)
 const noteDateKey = shallowRef('')
 const noteText = ref('')
 const noteOpen = ref(false)
@@ -108,9 +96,7 @@ watch(isAuthenticated, (auth) => {
 
 function onToolbarSelect(id: string) {
   toolbarActiveId.value = id
-  if (id === 'search') {
-    searchOpen.value = true
-  } else if (id === 'settings') {
+  if (id === 'settings') {
     settingsOpen.value = !settingsOpen.value
   } else if (id === 'profile') {
     logout()
@@ -219,23 +205,6 @@ function onSelectEvent(ev: CalendarEvent) {
   eventDetailOpen.value = true
 }
 
-function handleSearch(query: string) {
-  if (!query.trim()) return
-  search(query)
-}
-
-function handleSearchCreateEvent(_item: SearchResultItem) {
-  editingEvent.value = null
-  formInitialDate.value = selectedDate.value
-  eventFormOpen.value = true
-  searchOpen.value = false
-}
-
-function handleCloseSearch() {
-  searchOpen.value = false
-  clearSearch()
-}
-
 const weekdayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
 function getWeekdayLabel(dateKey: string) {
@@ -259,7 +228,7 @@ function handleVoiceConfirm() {
   closeOverlay()
   const intent = parsedIntent.value
   if (intent) {
-    speak(`好的，已为你${intent.action === 'search' ? '搜索' : '创建日程'}：${intent.title}`)
+    speak(`好的，已为你创建日程：${intent.title}`)
   }
 }
 </script>
@@ -359,17 +328,6 @@ function handleVoiceConfirm() {
       :conflicts="conflicts"
       @resolve="handleConflictResolve"
       @ignore="handleConflictIgnore"
-    />
-
-    <SearchPanel
-      :open="searchOpen"
-      :query="searchQueryText"
-      :results="searchResults"
-      :summary="searchSummary"
-      :is-searching="isSearching"
-      @close="handleCloseSearch"
-      @search="handleSearch"
-      @create-event="handleSearchCreateEvent"
     />
 
     <SettingsPanel
