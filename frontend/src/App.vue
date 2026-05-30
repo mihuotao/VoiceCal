@@ -37,18 +37,19 @@ const {
   selectDate
 } = useCalendar()
 
-const {
-  status,
-  amplitude,
-  isOverlayOpen,
-  transcript,
-  partialText,
-  parsedIntent,
-  openOverlay,
-  closeOverlay,
-  startRecording,
-  stopRecording
-} = useVoice()
+  const {
+    status,
+    amplitude,
+    isOverlayOpen,
+    transcript,
+    partialText,
+    errorMessage,
+    parsedIntent,
+    openOverlay,
+    closeOverlay,
+    startRecording,
+    stopRecording
+  } = useVoice()
 
 const {
   datesWithEvents,
@@ -79,6 +80,7 @@ const eventFormOpen = ref(false)
 const eventDetailOpen = ref(false)
 const editingEvent = ref<CalendarEvent | null>(null)
 const formInitialDate = ref('')
+const formInitialTitle = ref('')
 const selectedEvent = ref<CalendarEvent | null>(null)
 const conflicts = ref<CalendarEvent[]>([])
 
@@ -225,9 +227,13 @@ function formatEventTime(ev: CalendarEvent) {
 }
 
 function handleVoiceConfirm() {
-  closeOverlay()
   const intent = parsedIntent.value
-  if (intent) {
+  closeOverlay()
+  if (intent && intent.title) {
+    editingEvent.value = null
+    formInitialDate.value = selectedDate.value
+    formInitialTitle.value = intent.title
+    eventFormOpen.value = true
     speak(`好的，已为你创建日程：${intent.title}`)
   }
 }
@@ -341,6 +347,7 @@ function handleVoiceConfirm() {
       :amplitude="amplitude"
       :transcript="transcript"
       :partial-text="partialText"
+      :error-message="errorMessage"
       :intent="parsedIntent"
       @close="closeOverlay"
       @confirm-create="handleVoiceConfirm"
@@ -354,6 +361,7 @@ function handleVoiceConfirm() {
       :open="eventFormOpen"
       :event="editingEvent"
       :initial-date="formInitialDate"
+      :initial-title="formInitialTitle"
       @close="eventFormOpen = false"
       @save="handleSaveEvent"
       @delete="handleDeleteEvent"

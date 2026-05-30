@@ -8,6 +8,7 @@ export function useWebSocket(url: string) {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   let onMessageHandler: ((data: string) => void) | null = null
+  let onBinaryMessageHandler: ((data: ArrayBuffer) => void) | null = null
   let autoReconnect = true
   let isManualClose = false
 
@@ -36,8 +37,10 @@ export function useWebSocket(url: string) {
       ws?.close()
     }
     ws.onmessage = (evt) => {
-      if (typeof evt.data === 'string' && onMessageHandler) {
-        onMessageHandler(evt.data)
+      if (typeof evt.data === 'string') {
+        onMessageHandler?.(evt.data)
+      } else if (evt.data instanceof ArrayBuffer || evt.data instanceof Blob) {
+        onBinaryMessageHandler?.(evt.data as ArrayBuffer)
       }
     }
   }
@@ -64,6 +67,10 @@ export function useWebSocket(url: string) {
     onMessageHandler = handler
   }
 
+  function onBinaryMessage(handler: (data: ArrayBuffer) => void) {
+    onBinaryMessageHandler = handler
+  }
+
   onUnmounted(() => {
     disconnect()
   })
@@ -73,6 +80,7 @@ export function useWebSocket(url: string) {
     connect,
     disconnect,
     send,
-    onMessage
+    onMessage,
+    onBinaryMessage
   }
 }

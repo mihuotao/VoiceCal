@@ -13,12 +13,14 @@ const props = withDefaults(defineProps<{
   amplitude?: number
   transcript?: string
   partialText?: string
+  errorMessage?: string
   intent?: ParsedIntent | null
 }>(), {
   status: 'idle',
   amplitude: 0,
   transcript: '',
   partialText: '',
+  errorMessage: '',
   intent: null
 })
 
@@ -116,17 +118,24 @@ function handleClose() {
 
           <div class="voice-overlay__status">
             <span v-if="status === 'listening'" class="voice-overlay__hint">点击下方按钮开始录音</span>
-            <span v-else-if="status === 'recording'" class="voice-overlay__dots">
-              正在聆听
-              <span class="dot">.</span>
-              <span class="dot">.</span>
-              <span class="dot">.</span>
+            <span v-else-if="status === 'recording'" class="voice-overlay__realtime">
+              <span class="voice-overlay__dots">
+                正在聆听
+                <span class="dot">.</span>
+                <span class="dot">.</span>
+                <span class="dot">.</span>
+              </span>
+              <span v-if="partialText" class="voice-overlay__partial">{{ partialText }}</span>
+              <span v-else class="voice-overlay__partial-hint">请说话...</span>
             </span>
             <span v-else-if="status === 'processing'" class="voice-overlay__processing">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="voice-spinner">
                 <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10" />
               </svg>
-              {{ partialText || '识别中' }}
+              {{ partialText || '识别中...' }}
+            </span>
+            <span v-if="errorMessage && (status === 'processing' || status === 'recording')" class="voice-overlay__error">
+              {{ errorMessage }}
             </span>
           </div>
         </div>
@@ -279,6 +288,36 @@ function handleClose() {
   display: flex;
   align-items: center;
   gap: $space-2;
+}
+
+.voice-overlay__realtime {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-2;
+}
+
+.voice-overlay__partial {
+  font-size: $font-size-xl;
+  color: white;
+  font-weight: $font-weight-medium;
+  max-width: 80%;
+  text-align: center;
+  word-break: break-all;
+}
+
+.voice-overlay__partial-hint {
+  font-size: $font-size-base;
+  color: $color-text-tertiary;
+  opacity: 0.6;
+}
+
+.voice-overlay__error {
+  font-size: $font-size-sm;
+  color: $color-danger;
+  text-align: center;
+  margin-top: $space-2;
+  opacity: 0.9;
 }
 
 .voice-spinner {

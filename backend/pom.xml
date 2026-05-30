@@ -104,6 +104,13 @@
             <version>${springdoc.version}</version>
         </dependency>
 
+        <!-- OkHttp (百度实时 ASR WebSocket 客户端) -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

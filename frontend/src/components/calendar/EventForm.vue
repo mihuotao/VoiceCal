@@ -21,9 +21,11 @@ const props = withDefaults(defineProps<{
   open: boolean
   event?: CalendarEvent | null
   initialDate?: string
+  initialTitle?: string
 }>(), {
   open: false,
-  initialDate: ''
+  initialDate: '',
+  initialTitle: ''
 })
 
 const emit = defineEmits<{
@@ -127,7 +129,7 @@ watch(() => props.open, (opened) => {
   } else {
     isEditing.value = false
     const d = props.initialDate || new Date().toISOString().slice(0, 10)
-    form.title = ''
+    form.title = props.initialTitle || ''
     form.description = ''
     form.date = d
     form.startTime = '09:00'

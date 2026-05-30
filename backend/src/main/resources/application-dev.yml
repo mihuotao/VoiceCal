@@ -13,6 +13,6 @@ spring:
 
 baidu:
   voice:
-    app-id: your_app_id
-    api-key: your_api_key
-    secret-key: your_secret_key
+    app-id: 123514570
+    api-key: 664pqoYLPjCCIBOlhOiHyrVU
+    secret-key: JvfWD5KPWlnOLjrc41yt66gaDRkflV1n
