@@ -2,6 +2,7 @@ package com.voicecal.voice;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.voicecal.auth.JwtProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.Base64;
@@ -29,25 +31,48 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
     private final Map<String, List<byte[]>> pendingAudioBuffers = new ConcurrentHashMap<>();
     private final Map<String, String> sessionIdMap = new ConcurrentHashMap<>();
     private final Map<String, StringBuilder> legacyBuffers = new ConcurrentHashMap<>();
+    private final Map<String, Long> userIdMap = new ConcurrentHashMap<>();
 
     private final ObjectMapper objectMapper;
     private final BaiduStreamAsrService streamAsrService;
     private final BaiduAsrService asrService;
     private final VoiceCommandService voiceCommandService;
+    private final JwtProvider jwtProvider;
 
     public VoiceWebSocketHandler(ObjectMapper objectMapper,
                                   BaiduStreamAsrService streamAsrService,
                                   BaiduAsrService asrService,
-                                  VoiceCommandService voiceCommandService) {
+                                  VoiceCommandService voiceCommandService,
+                                  JwtProvider jwtProvider) {
         this.objectMapper = objectMapper;
         this.streamAsrService = streamAsrService;
         this.asrService = asrService;
         this.voiceCommandService = voiceCommandService;
+        this.jwtProvider = jwtProvider;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         sessions.put(session.getId(), session);
+
+        // 从 URI 参数获取 token 并解析用户 ID
+        try {
+            String query = session.getUri() != null ? session.getUri().getQuery() : null;
+            log.info("WebSocket URI query: {}", query);
+            if (query != null) {
+                var params = UriComponentsBuilder.fromUriString("?" + query).build().getQueryParams();
+                String token = params.getFirst("token");
+                log.info("WebSocket token length: {}", token != null ? token.length() : 0);
+                if (token != null && !token.isBlank()) {
+                    Long userId = jwtProvider.getUserIdFromToken(token);
+                    userIdMap.put(session.getId(), userId);
+                    log.info("WebSocket 用户认证成功: sessionId={}, userId={}", session.getId(), userId);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("WebSocket 用户认证失败: sessionId={}, error={}, class={}", session.getId(), e.getMessage(), e.getClass().getName());
+        }
+
         log.info("前端 WebSocket 连接建立: sessionId={}", session.getId());
     }
 
@@ -115,7 +140,8 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
                                 "sessionId", sessionId,
                                 "payload", Map.of("text", result.getText(), "isFinal", true)));
 
-                        Map<String, Object> commandResult = voiceCommandService.processTextCommand(1L, result.getText());
+                        Long userId = userIdMap.getOrDefault(wsId, 1L);
+                        Map<String, Object> commandResult = voiceCommandService.processTextCommand(userId, result.getText());
                         sendJson(session, Map.of(
                                 "type", "final_result",
                                 "sessionId", sessionId,
@@ -227,7 +253,8 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
                 "sessionId", sessionId,
                 "payload", Map.of("text", recognizedText, "isFinal", true)));
 
-        Map<String, Object> commandResult = voiceCommandService.processTextCommand(1L, recognizedText);
+        Long userId = userIdMap.getOrDefault(session.getId(), 1L);
+        Map<String, Object> commandResult = voiceCommandService.processTextCommand(userId, recognizedText);
         sendJson(session, Map.of(
                 "type", "final_result",
                 "sessionId", sessionId,
@@ -258,6 +285,7 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
         sessions.remove(wsId);
         sessionIdMap.remove(wsId);
         legacyBuffers.remove(wsId);
+        userIdMap.remove(wsId);
         log.info("前端 WebSocket 连接关闭: sessionId={}", wsId);
     }
 

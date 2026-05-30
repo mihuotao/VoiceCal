@@ -58,6 +58,14 @@ const actionLabel: Record<string, string> = {
         <span class="voice-result__field-label">标题</span>
         <span class="voice-result__field-value">{{ intent.title }}</span>
       </div>
+      <div v-if="intent.action === 'query' && intent.queryDate" class="voice-result__field">
+        <span class="voice-result__field-label">查询日期</span>
+        <span class="voice-result__field-value">{{ intent.queryDate }}</span>
+      </div>
+      <div v-if="intent.action === 'query' && intent.events" class="voice-result__field">
+        <span class="voice-result__field-label">找到事件</span>
+        <span class="voice-result__field-value">{{ intent.events.length }} 个安排</span>
+      </div>
     </div>
 
     <div class="voice-result__actions">
@@ -83,7 +91,7 @@ const actionLabel: Record<string, string> = {
         variant="primary"
         @click="emit('confirm')"
       >
-        确认创建
+        {{ intent?.action === 'query' ? '查看结果' : '确认创建' }}
       </GlassButton>
     </div>
   </div>

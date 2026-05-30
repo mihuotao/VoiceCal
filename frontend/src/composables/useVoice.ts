@@ -2,7 +2,11 @@ import { ref } from 'vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import type { VoiceStatus, ParsedIntent } from '@/types/voice'
 
-const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/voice`
+function getWsUrl(): string {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/ws/voice?token=${encodeURIComponent(token)}`
+}
 const TARGET_SAMPLE_RATE = 16000
 const BUFFER_SIZE = 2048
 const SILENCE_TIMEOUT_MS = 2000
@@ -49,7 +53,7 @@ export function useVoice() {
     onMessage,
     onBinaryMessage,
     resetReconnect
-  } = useWebSocket(WS_URL)
+  } = useWebSocket(getWsUrl())
 
   // ==================== 资源管理 ====================
 
@@ -224,14 +228,28 @@ export function useVoice() {
           case 'final_result':
             if (asrTimeout) { clearTimeout(asrTimeout); asrTimeout = null }
             partialText.value = ''
-            transcript.value = transcript.value || msg.payload?.title || ''
-            parsedIntent.value = {
-              action: msg.payload?.action || 'create',
-              title: msg.payload?.title || transcript.value,
-              description: msg.payload?.description || '',
-              startTime: msg.payload?.startTime || new Date(Date.now() + 86400000).toISOString(),
-              endTime: msg.payload?.endTime || new Date(Date.now() + 86400000 + 3600000).toISOString(),
-              confidence: msg.payload?.confidence || 0.9
+            transcript.value = transcript.value || msg.payload?.text || ''
+
+            // 根据意图类型解析结果
+            if (msg.payload?.action?.type === 'query') {
+              // 查询意图
+              parsedIntent.value = {
+                action: 'query',
+                queryDate: msg.payload.action.queryDate || '',
+                events: msg.payload.action.events || [],
+                responseText: msg.payload?.responseText || '',
+                confidence: msg.payload?.confidence || 0.9
+              }
+            } else {
+              // 创建意图（默认）
+              parsedIntent.value = {
+                action: msg.payload?.action?.type || msg.payload?.action || 'create',
+                title: msg.payload?.action?.event?.title || msg.payload?.title || transcript.value,
+                description: msg.payload?.description || '',
+                startTime: msg.payload?.action?.event?.startTime || msg.payload?.startTime || new Date(Date.now() + 86400000).toISOString(),
+                endTime: msg.payload?.action?.event?.endTime || msg.payload?.endTime || new Date(Date.now() + 86400000 + 3600000).toISOString(),
+                confidence: msg.payload?.confidence || 0.9
+              }
             }
             // ✅ 关键：收到最终结果后立即转换到终态，自动释放资源
             transitionTo('result')

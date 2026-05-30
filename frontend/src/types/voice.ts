@@ -9,6 +9,10 @@ export interface ParsedIntent {
   allDay?: boolean
   query?: string
   confidence: number
+  // 查询结果字段
+  queryDate?: string
+  events?: import('@/types/event').CalendarEvent[]
+  responseText?: string
 }
 
 export interface ASRResult {

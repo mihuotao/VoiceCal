@@ -12,6 +12,7 @@ import ConflictPanel from '@/components/calendar/ConflictPanel.vue'
 import FestivalCard from '@/components/calendar/FestivalCard.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
+import QueryResultPanel from '@/components/voice/QueryResultPanel.vue'
 import { useCalendar } from '@/composables/useCalendar'
 import { useVoice } from '@/composables/useVoice'
 import { useEvents } from '@/composables/useEvents'
@@ -83,6 +84,12 @@ const formInitialDate = ref('')
 const formInitialTitle = ref('')
 const selectedEvent = ref<CalendarEvent | null>(null)
 const conflicts = ref<CalendarEvent[]>([])
+
+// 查询结果弹窗状态
+const queryResultOpen = ref(false)
+const queryEvents = ref<CalendarEvent[]>([])
+const queryDate = ref('')
+const queryResponseText = ref('')
 
 onMounted(() => {
   fetchEvents()
@@ -229,7 +236,21 @@ function formatEventTime(ev: CalendarEvent) {
 function handleVoiceConfirm() {
   const intent = parsedIntent.value
   closeOverlay()
-  if (intent && intent.title) {
+
+  if (!intent) return
+
+  if (intent.action === 'query') {
+    // 查询意图：展示查询结果弹窗
+    queryEvents.value = intent.events || []
+    queryDate.value = intent.queryDate || ''
+    queryResponseText.value = intent.responseText || ''
+    queryResultOpen.value = true
+    // TTS 播报
+    if (intent.responseText) {
+      speak(intent.responseText)
+    }
+  } else if (intent.title) {
+    // 创建意图：打开事件表单
     editingEvent.value = null
     formInitialDate.value = selectedDate.value
     formInitialTitle.value = intent.title
@@ -355,6 +376,14 @@ function handleVoiceConfirm() {
       @stop-record="stopRecording"
       @retry="startRecording"
       @edit-result="closeOverlay"
+    />
+
+    <QueryResultPanel
+      :open="queryResultOpen"
+      :date="queryDate"
+      :events="queryEvents"
+      :response-text="queryResponseText"
+      @close="queryResultOpen = false"
     />
 
     <EventForm

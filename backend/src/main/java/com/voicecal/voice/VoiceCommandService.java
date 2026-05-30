@@ -2,6 +2,7 @@ package com.voicecal.voice;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voicecal.common.ApiResult;
+import com.voicecal.entity.CalendarEvent;
 import com.voicecal.entity.Festival;
 import com.voicecal.entity.FestivalGreetingLog;
 import com.voicecal.entity.VoiceCommandLog;
@@ -17,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -77,7 +79,13 @@ public class VoiceCommandService {
                     responseText = "已为您创建事件「" + req.get("title") + "」";
                 }
                 case "QUERY" -> {
-                    responseText = "正在为您查询日历...";
+                    Map<String, Object> queryResult = handleQuery(userId, nluResult);
+                    response.put("action", Map.of(
+                            "type", "query",
+                            "events", queryResult.get("events"),
+                            "queryDate", queryResult.get("queryDate")
+                    ));
+                    responseText = (String) queryResult.get("responseText");
                 }
                 case "UPDATE" -> {
                     responseText = "好的，已为您更新事件";
@@ -174,6 +182,75 @@ public class VoiceCommandService {
             log.error("节日关怀 TTS 失败: userId={}", userId, e);
             return ApiResult.error(com.voicecal.common.ResultCode.TTS_SERVICE_ERROR);
         }
+    }
+
+    private Map<String, Object> handleQuery(Long userId, NluResult nluResult) {
+        Map<String, Object> result = new HashMap<>();
+
+        // 从 NLU 实体中提取日期，默认今天
+        String dateStr = (String) nluResult.getEntities().get("date");
+        LocalDate queryDate;
+        if (dateStr != null && !dateStr.isBlank()) {
+            try {
+                queryDate = LocalDate.parse(dateStr);
+            } catch (Exception e) {
+                queryDate = LocalDate.now();
+            }
+        } else {
+            queryDate = LocalDate.now();
+        }
+
+        // 查询该日期的事件
+        List<CalendarEvent> events = eventService.listByDateRange(userId, queryDate, queryDate);
+
+        // 构建返回数据
+        List<Map<String, Object>> eventList = new ArrayList<>();
+        for (CalendarEvent event : events) {
+            Map<String, Object> ev = new HashMap<>();
+            ev.put("id", event.getId());
+            ev.put("title", event.getTitle());
+            ev.put("description", event.getDescription());
+            ev.put("startTime", event.getStartTime() != null
+                    ? event.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null);
+            ev.put("endTime", event.getEndTime() != null
+                    ? event.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null);
+            ev.put("allDay", event.getAllDay());
+            ev.put("location", event.getLocation());
+            ev.put("color", event.getColor());
+            ev.put("category", event.getCategory());
+            eventList.add(ev);
+        }
+
+        // 构建 TTS 播报文本
+        String responseText;
+        String dateLabel = queryDate.equals(LocalDate.now()) ? "今天"
+                : queryDate.equals(LocalDate.now().plusDays(1)) ? "明天"
+                : queryDate.format(DateTimeFormatter.ofPattern("M月d日"));
+
+        if (events.isEmpty()) {
+            responseText = dateLabel + "没有日程安排";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append(dateLabel).append("有").append(events.size()).append("个安排：");
+            for (int i = 0; i < events.size(); i++) {
+                CalendarEvent ev = events.get(i);
+                if (i > 0) sb.append("，");
+                if (ev.getStartTime() != null) {
+                    LocalTime time = ev.getStartTime().toLocalTime();
+                    sb.append(time.getHour()).append("点");
+                    if (time.getMinute() > 0) {
+                        sb.append(time.getMinute()).append("分");
+                    }
+                }
+                sb.append(ev.getTitle());
+            }
+            responseText = sb.toString();
+        }
+
+        result.put("events", eventList);
+        result.put("queryDate", queryDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        result.put("responseText", responseText);
+        return result;
     }
 
     private Map<String, Object> buildCreateRequest(NluResult nluResult) {

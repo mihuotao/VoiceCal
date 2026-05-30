@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, nextTick } from 'vue'
 import { motion } from 'motion-v'
 import { springPresets } from '@/composables/useMotion'
 import VoiceOrbCanvas from '@/components/voice/VoiceOrbCanvas.vue'
@@ -33,9 +33,12 @@ const emit = defineEmits<{
   stopRecord: []
 }>()
 
-watch(() => props.open, (v) => {
-  if (v && props.status === 'listening') {
-    emit('startRecord')
+watch(() => props.open, async (v) => {
+  if (v) {
+    await nextTick()
+    if (props.status === 'listening') {
+      emit('startRecord')
+    }
   }
 })
 
