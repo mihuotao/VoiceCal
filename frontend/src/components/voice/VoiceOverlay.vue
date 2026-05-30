@@ -102,7 +102,7 @@ function handleClose() {
         <div v-else class="voice-overlay__content">
           <div class="voice-overlay__orb">
             <VoiceOrbCanvas
-              :status="status === 'recording' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
+              :status="status === 'recording' || status === 'processing' ? 'recording' : 'idle'"
               :amplitude="amplitude"
               :size="140"
             />
@@ -111,7 +111,7 @@ function handleClose() {
           <div class="voice-overlay__waveform">
             <VoiceWaveform
               :amplitude="amplitude"
-              :is-active="status === 'listening' || status === 'recording'"
+              :is-active="status === 'listening' || status === 'recording' || status === 'processing'"
               :height="60"
             />
           </div>
@@ -128,11 +128,13 @@ function handleClose() {
               <span v-if="partialText" class="voice-overlay__partial">{{ partialText }}</span>
               <span v-else class="voice-overlay__partial-hint">请说话...</span>
             </span>
-            <span v-else-if="status === 'processing'" class="voice-overlay__processing">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="voice-spinner">
-                <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10" />
-              </svg>
-              {{ partialText || '识别中...' }}
+            <span v-else-if="status === 'processing'" class="voice-overlay__realtime">
+              <span v-if="partialText" class="voice-overlay__partial">{{ partialText }}</span>
+              <span v-else class="voice-overlay__partial-hint">识别中...</span>
+            </span>
+            <span v-else-if="status === 'error'" class="voice-overlay__error-container">
+              <span class="voice-overlay__error-icon">⚠️</span>
+              <span class="voice-overlay__error-text">{{ errorMessage || '识别失败，请重试' }}</span>
             </span>
             <span v-if="errorMessage && (status === 'processing' || status === 'recording')" class="voice-overlay__error">
               {{ errorMessage }}
@@ -175,6 +177,20 @@ function handleClose() {
               <polyline points="20 6 9 17 4 12" />
             </svg>
             完成
+          </motion.button>
+          <motion.button
+            v-if="status === 'error'"
+            class="voice-overlay__action voice-overlay__action--retry"
+            :while-hover="{ scale: 1.06 }"
+            :while-tap="{ scale: 0.94 }"
+            :transition="springPresets.snappy"
+            @click="emit('retry')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            重试
           </motion.button>
         </div>
       </motion.div>
@@ -320,8 +336,22 @@ function handleClose() {
   opacity: 0.9;
 }
 
-.voice-spinner {
-  animation: rotate-slow 0.8s linear infinite;
+.voice-overlay__error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-4;
+}
+
+.voice-overlay__error-icon {
+  font-size: 32px;
+}
+
+.voice-overlay__error-text {
+  font-size: $font-size-base;
+  color: $color-danger;
+  text-align: center;
 }
 
 .voice-overlay__footer {
@@ -378,6 +408,17 @@ function handleClose() {
     &:hover {
       background: rgba($color-success, 0.3);
       box-shadow: 0 0 16px rgba($color-success, 0.2);
+    }
+  }
+
+  &--retry {
+    background: rgba($color-warning, 0.2);
+    border-color: rgba($color-warning, 0.3);
+    color: $color-warning;
+
+    &:hover {
+      background: rgba($color-warning, 0.3);
+      box-shadow: 0 0 16px rgba($color-warning, 0.2);
     }
   }
 }

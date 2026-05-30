@@ -1,4 +1,4 @@
-export type VoiceStatus = 'idle' | 'listening' | 'recording' | 'processing' | 'result'
+export type VoiceStatus = 'idle' | 'listening' | 'recording' | 'processing' | 'result' | 'error'
 
 export interface ParsedIntent {
   action: 'create' | 'query' | 'search' | 'delete' | 'unknown'
