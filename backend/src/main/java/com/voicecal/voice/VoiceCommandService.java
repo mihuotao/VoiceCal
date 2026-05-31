@@ -80,11 +80,12 @@ public class VoiceCommandService {
                 }
                 case "QUERY" -> {
                     Map<String, Object> queryResult = handleQuery(userId, nluResult);
-                    response.put("action", Map.of(
-                            "type", "query",
-                            "events", queryResult.get("events"),
-                            "queryDate", queryResult.get("queryDate")
-                    ));
+                    Map<String, Object> action = new HashMap<>();
+                    action.put("type", "query");
+                    action.put("events", queryResult.get("events"));
+                    action.put("queryDate", queryResult.get("queryDate"));
+                    action.put("queryEndDate", queryResult.get("queryEndDate"));
+                    response.put("action", action);
                     responseText = (String) queryResult.get("responseText");
                 }
                 case "UPDATE" -> {
@@ -98,7 +99,10 @@ public class VoiceCommandService {
                 }
                 default -> {
                     commandResult = "failed";
-                    responseText = "抱歉，我没有理解您的指令";
+                    responseText = nluResult.isRequiresClarify() && nluResult.getClarifyQuestion() != null
+                            ? nluResult.getClarifyQuestion()
+                            : "抱歉，我没有理解您的指令";
+                    response.put("action", Map.of("type", "unknown"));
                 }
             }
         } catch (Exception e) {
@@ -187,21 +191,35 @@ public class VoiceCommandService {
     private Map<String, Object> handleQuery(Long userId, NluResult nluResult) {
         Map<String, Object> result = new HashMap<>();
 
-        // 从 NLU 实体中提取日期，默认今天
-        String dateStr = (String) nluResult.getEntities().get("date");
-        LocalDate queryDate;
-        if (dateStr != null && !dateStr.isBlank()) {
-            try {
-                queryDate = LocalDate.parse(dateStr);
-            } catch (Exception e) {
-                queryDate = LocalDate.now();
-            }
-        } else {
-            queryDate = LocalDate.now();
-        }
+        // 从 NLU 实体中提取日期范围
+        LocalDate startDate = parseDate((String) nluResult.getEntities().get("startDate"));
+        LocalDate endDate = parseDate((String) nluResult.getEntities().get("endDate"));
 
-        // 查询该日期的事件
-        List<CalendarEvent> events = eventService.listByDateRange(userId, queryDate, queryDate);
+        // 兼容旧逻辑：单日 date 字段
+        if (startDate == null) {
+            startDate = parseDate((String) nluResult.getEntities().get("date"));
+        }
+        if (startDate == null) startDate = LocalDate.now();
+        if (endDate == null) endDate = startDate;
+
+        // 提取分类过滤条件
+        String category = (String) nluResult.getEntities().get("category");
+
+        log.info("语音查询: userId={}, startDate={}, endDate={}, category={}, entities={}",
+                userId, startDate, endDate, category, nluResult.getEntities());
+
+        // 查询日期范围内的事件
+        List<CalendarEvent> events = eventService.listByDateRange(userId, startDate, endDate);
+
+        log.info("查询结果: 找到 {} 个事件", events.size());
+
+        // 按分类过滤
+        if (category != null && !category.isBlank()) {
+            String finalCategory = category;
+            events = events.stream()
+                    .filter(e -> finalCategory.equals(e.getCategory()))
+                    .collect(java.util.stream.Collectors.toList());
+        }
 
         // 构建返回数据
         List<Map<String, Object>> eventList = new ArrayList<>();
@@ -211,46 +229,114 @@ public class VoiceCommandService {
             ev.put("title", event.getTitle());
             ev.put("description", event.getDescription());
             ev.put("startTime", event.getStartTime() != null
-                    ? event.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null);
+                    ? event.getStartTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null);
             ev.put("endTime", event.getEndTime() != null
-                    ? event.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null);
+                    ? event.getEndTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null);
             ev.put("allDay", event.getAllDay());
             ev.put("location", event.getLocation());
             ev.put("color", event.getColor());
             ev.put("category", event.getCategory());
+            ev.put("priority", event.getPriority());
+            ev.put("status", event.getStatus());
             eventList.add(ev);
         }
 
         // 构建 TTS 播报文本
-        String responseText;
-        String dateLabel = queryDate.equals(LocalDate.now()) ? "今天"
-                : queryDate.equals(LocalDate.now().plusDays(1)) ? "明天"
-                : queryDate.format(DateTimeFormatter.ofPattern("M月d日"));
-
-        if (events.isEmpty()) {
-            responseText = dateLabel + "没有日程安排";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            sb.append(dateLabel).append("有").append(events.size()).append("个安排：");
-            for (int i = 0; i < events.size(); i++) {
-                CalendarEvent ev = events.get(i);
-                if (i > 0) sb.append("，");
-                if (ev.getStartTime() != null) {
-                    LocalTime time = ev.getStartTime().toLocalTime();
-                    sb.append(time.getHour()).append("点");
-                    if (time.getMinute() > 0) {
-                        sb.append(time.getMinute()).append("分");
-                    }
-                }
-                sb.append(ev.getTitle());
-            }
-            responseText = sb.toString();
-        }
+        String responseText = buildQueryResponseText(startDate, endDate, events, category);
 
         result.put("events", eventList);
-        result.put("queryDate", queryDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        result.put("queryDate", startDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        result.put("queryEndDate", endDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
         result.put("responseText", responseText);
         return result;
+    }
+
+    /**
+     * 安全解析日期字符串
+     */
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) return null;
+        try {
+            return LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 构建查询结果的 TTS 播报文本
+     */
+    private String buildQueryResponseText(LocalDate startDate, LocalDate endDate,
+                                           List<CalendarEvent> events, String category) {
+        String dateLabel = buildDateLabel(startDate, endDate);
+        String categoryLabel = buildCategoryLabel(category);
+
+        if (events.isEmpty()) {
+            return dateLabel + categoryLabel + "没有日程安排";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(dateLabel).append(categoryLabel).append("有").append(events.size()).append("个安排：");
+
+        for (int i = 0; i < events.size(); i++) {
+            CalendarEvent ev = events.get(i);
+            if (i > 0) sb.append("，");
+
+            // 日期标签（范围查询时显示日期）
+            if (!startDate.equals(endDate) && ev.getStartTime() != null) {
+                LocalDate evDate = ev.getStartTime().toLocalDate();
+                sb.append(evDate.getMonthValue()).append("月").append(evDate.getDayOfMonth()).append("号");
+            }
+
+            if (ev.getStartTime() != null) {
+                LocalTime time = ev.getStartTime().toLocalTime();
+                sb.append(time.getHour()).append("点");
+                if (time.getMinute() > 0) {
+                    sb.append(time.getMinute()).append("分");
+                }
+            }
+            sb.append(ev.getTitle());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 构建日期标签
+     */
+    private String buildDateLabel(LocalDate startDate, LocalDate endDate) {
+        LocalDate today = LocalDate.now();
+
+        if (startDate.equals(endDate)) {
+            // 单日
+            if (startDate.equals(today)) return "今天";
+            if (startDate.equals(today.plusDays(1))) return "明天";
+            if (startDate.equals(today.minusDays(1))) return "昨天";
+            return startDate.getMonthValue() + "月" + startDate.getDayOfMonth() + "号";
+        }
+
+        // 范围
+        if (startDate.equals(today.with(java.time.DayOfWeek.MONDAY))
+                && endDate.equals(today.with(java.time.DayOfWeek.SUNDAY))) {
+            return "本周";
+        }
+        if (startDate.getDayOfMonth() == 1 && endDate.equals(startDate.withDayOfMonth(startDate.lengthOfMonth()))) {
+            return startDate.getMonthValue() + "月";
+        }
+        return startDate.getMonthValue() + "月" + startDate.getDayOfMonth() + "号到"
+                + endDate.getMonthValue() + "月" + endDate.getDayOfMonth() + "号";
+    }
+
+    /**
+     * 构建分类标签
+     */
+    private String buildCategoryLabel(String category) {
+        if (category == null || category.isBlank()) return "";
+        return switch (category) {
+            case "work" -> "工作";
+            case "family" -> "家庭";
+            case "personal" -> "个人";
+            default -> "";
+        } + "类";
     }
 
     private Map<String, Object> buildCreateRequest(NluResult nluResult) {

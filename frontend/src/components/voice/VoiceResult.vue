@@ -1,15 +1,29 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { motion } from 'motion-v'
 import { springPresets } from '@/composables/useMotion'
 import GlassButton from '@/components/glass/GlassButton.vue'
 import type { ParsedIntent } from '@/types/voice'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   transcript: string
   intent?: ParsedIntent | null
 }>(), {
   transcript: '',
   intent: null
+})
+
+const confirmButtonText = computed(() => {
+  switch (props.intent?.action) {
+    case 'query': return '查看结果'
+    case 'create': return '确认创建'
+    case 'update': return '确认修改'
+    case 'delete': return '确认删除'
+    case 'reminder': return '确认提醒'
+    case 'clarify': return '重新录音'
+    case 'unknown': return '重新录音'
+    default: return '确认'
+  }
 })
 
 const emit = defineEmits<{
@@ -22,8 +36,10 @@ const emit = defineEmits<{
 const actionLabel: Record<string, string> = {
   create: '创建日程',
   query: '查询日程',
-  search: '联网搜索',
+  update: '更新日程',
   delete: '删除日程',
+  reminder: '设置提醒',
+  clarify: '需要补充',
   unknown: '无法识别'
 }
 </script>
@@ -54,17 +70,28 @@ const actionLabel: Record<string, string> = {
           置信度 {{ Math.round(intent.confidence * 100) }}%
         </span>
       </div>
-      <div v-if="intent.title" class="voice-result__field">
+
+      <!-- 澄清提示 -->
+      <div v-if="intent.action === 'clarify' && intent.clarifyQuestion" class="voice-result__field">
+        <span class="voice-result__field-label">系统提示</span>
+        <span class="voice-result__field-value">{{ intent.clarifyQuestion }}</span>
+      </div>
+
+      <div v-if="intent.title && intent.action !== 'clarify'" class="voice-result__field">
         <span class="voice-result__field-label">标题</span>
         <span class="voice-result__field-value">{{ intent.title }}</span>
       </div>
       <div v-if="intent.action === 'query' && intent.queryDate" class="voice-result__field">
         <span class="voice-result__field-label">查询日期</span>
-        <span class="voice-result__field-value">{{ intent.queryDate }}</span>
+        <span class="voice-result__field-value">{{ intent.queryDate }}{{ intent.queryEndDate && intent.queryEndDate !== intent.queryDate ? ' 至 ' + intent.queryEndDate : '' }}</span>
       </div>
       <div v-if="intent.action === 'query' && intent.events" class="voice-result__field">
         <span class="voice-result__field-label">找到事件</span>
         <span class="voice-result__field-value">{{ intent.events.length }} 个安排</span>
+      </div>
+      <div v-if="intent.action === 'unknown' && intent.responseText" class="voice-result__field">
+        <span class="voice-result__field-label">系统回复</span>
+        <span class="voice-result__field-value">{{ intent.responseText }}</span>
       </div>
     </div>
 
@@ -79,6 +106,7 @@ const actionLabel: Record<string, string> = {
         重新录音
       </motion.button>
       <motion.button
+        v-if="intent?.action !== 'unknown' && intent?.action !== 'clarify'"
         class="voice-result__btn voice-result__btn--secondary"
         :while-hover="{ scale: 1.04 }"
         :while-tap="{ scale: 0.97 }"
@@ -91,7 +119,7 @@ const actionLabel: Record<string, string> = {
         variant="primary"
         @click="emit('confirm')"
       >
-        {{ intent?.action === 'query' ? '查看结果' : '确认创建' }}
+        {{ confirmButtonText }}
       </GlassButton>
     </div>
   </div>
@@ -167,13 +195,25 @@ const actionLabel: Record<string, string> = {
       background: rgba($color-info, 0.15);
       color: $color-info;
     }
-    &--search {
+    &--update {
+      background: rgba($color-warning, 0.15);
+      color: $color-warning;
+    }
+    &--delete {
+      background: rgba($color-danger, 0.15);
+      color: $color-danger;
+    }
+    &--reminder {
       background: rgba($color-success, 0.15);
       color: $color-success;
     }
-    &--unknown {
+    &--clarify {
       background: rgba($color-warning, 0.15);
       color: $color-warning;
+    }
+    &--unknown {
+      background: rgba(255, 255, 255, 0.1);
+      color: $color-text-tertiary;
     }
   }
 

@@ -2,11 +2,30 @@ import { ref } from 'vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import type { VoiceStatus, ParsedIntent } from '@/types/voice'
 
-function getWsUrl(): string {
-  const token = localStorage.getItem('token') || ''
+/**
+ * 动态生成 WebSocket URL（每次调用时读取最新 token）
+ */
+function buildWsUrl(): string {
+  const token = localStorage.getItem('voicecal_token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/ws/voice?token=${encodeURIComponent(token)}`
 }
+
+/**
+ * 检查 JWT token 是否过期
+ */
+function isTokenExpired(): boolean {
+  const token = localStorage.getItem('voicecal_token')
+  if (!token) return true
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const exp = payload.exp * 1000 // 转为毫秒
+    return Date.now() >= exp
+  } catch {
+    return true
+  }
+}
+
 const TARGET_SAMPLE_RATE = 16000
 const BUFFER_SIZE = 2048
 const SILENCE_TIMEOUT_MS = 2000
@@ -44,7 +63,7 @@ export function useVoice() {
   let audioChunksSent = 0
   let isProcessing = false
 
-  // WebSocket 连接
+  // WebSocket 连接（不传固定 URL，使用动态 urlProvider）
   const {
     state: wsState,
     connect,
@@ -52,8 +71,12 @@ export function useVoice() {
     send,
     onMessage,
     onBinaryMessage,
-    resetReconnect
-  } = useWebSocket(getWsUrl())
+    resetReconnect,
+    setUrlProvider
+  } = useWebSocket()
+
+  // 设置动态 URL 提供函数：每次连接时读取最新 token
+  setUrlProvider(buildWsUrl)
 
   // ==================== 资源管理 ====================
 
@@ -230,25 +253,48 @@ export function useVoice() {
             partialText.value = ''
             transcript.value = transcript.value || msg.payload?.text || ''
 
-            // 根据意图类型解析结果
-            if (msg.payload?.action?.type === 'query') {
-              // 查询意图
+            // 检查是否需要澄清
+            if (msg.payload?.requiresClarify && msg.payload?.clarifyQuestion) {
+              // 需要澄清：展示问题，等待用户补充
               parsedIntent.value = {
-                action: 'query',
-                queryDate: msg.payload.action.queryDate || '',
-                events: msg.payload.action.events || [],
-                responseText: msg.payload?.responseText || '',
-                confidence: msg.payload?.confidence || 0.9
+                action: 'clarify',
+                clarifyQuestion: msg.payload.clarifyQuestion,
+                confidence: msg.payload?.confidence || 0.3
               }
-            } else {
-              // 创建意图（默认）
-              parsedIntent.value = {
-                action: msg.payload?.action?.type || msg.payload?.action || 'create',
-                title: msg.payload?.action?.event?.title || msg.payload?.title || transcript.value,
-                description: msg.payload?.description || '',
-                startTime: msg.payload?.action?.event?.startTime || msg.payload?.startTime || new Date(Date.now() + 86400000).toISOString(),
-                endTime: msg.payload?.action?.event?.endTime || msg.payload?.endTime || new Date(Date.now() + 86400000 + 3600000).toISOString(),
-                confidence: msg.payload?.confidence || 0.9
+              transitionTo('result')
+              break
+            }
+
+            // 根据意图类型解析结果
+            {
+              const actionType = msg.payload?.action?.type
+              if (actionType === 'query') {
+                // 查询意图
+                parsedIntent.value = {
+                  action: 'query',
+                  queryDate: msg.payload.action.queryDate || '',
+                  queryEndDate: msg.payload.action.queryEndDate || '',
+                  events: msg.payload.action.events || [],
+                  responseText: msg.payload?.responseText || '',
+                  confidence: msg.payload?.confidence || 0.9
+                }
+              } else if (actionType === 'unknown') {
+                // 未知意图
+                parsedIntent.value = {
+                  action: 'unknown',
+                  responseText: msg.payload?.responseText || '抱歉，我没有理解您的指令',
+                  confidence: msg.payload?.confidence || 0.3
+                }
+              } else {
+                // 创建/更新/删除/提醒意图
+                parsedIntent.value = {
+                  action: actionType || 'create',
+                  title: msg.payload?.action?.event?.title || msg.payload?.title || transcript.value,
+                  description: msg.payload?.description || '',
+                  startTime: msg.payload?.action?.event?.startTime || msg.payload?.startTime || new Date(Date.now() + 86400000).toISOString(),
+                  endTime: msg.payload?.action?.event?.endTime || msg.payload?.endTime || new Date(Date.now() + 86400000 + 3600000).toISOString(),
+                  confidence: msg.payload?.confidence || 0.9
+                }
               }
             }
             // ✅ 关键：收到最终结果后立即转换到终态，自动释放资源
@@ -280,8 +326,15 @@ export function useVoice() {
   async function waitForWsOpen(): Promise<boolean> {
     if (wsState.value === 'open') return true
 
+    // 检查 token 是否过期
+    if (isTokenExpired()) {
+      console.warn('Voice: Token 已过期，请重新登录')
+      errorMessage.value = '登录已过期，请重新登录'
+      return false
+    }
+
     resetReconnect()  // 重置重连计数
-    connect()
+    connect()  // connect 内部会调用 urlProvider 获取最新 token
 
     return new Promise((resolve) => {
       let checks = 0
@@ -483,6 +536,11 @@ export function useVoice() {
     // ✅ 关键：关闭时释放所有资源
     releaseAllResources()
     status.value = 'idle'
+    // 重置状态，防止残留数据
+    parsedIntent.value = null
+    transcript.value = ''
+    partialText.value = ''
+    errorMessage.value = ''
   }
 
   /**

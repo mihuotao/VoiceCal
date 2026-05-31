@@ -67,10 +67,23 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
                     Long userId = jwtProvider.getUserIdFromToken(token);
                     userIdMap.put(session.getId(), userId);
                     log.info("WebSocket 用户认证成功: sessionId={}, userId={}", session.getId(), userId);
+                } else {
+                    log.warn("WebSocket 未提供 token，拒绝连接: sessionId={}", session.getId());
+                    sendJson(session, Map.of("type", "error", "payload", Map.of("message", "未提供认证Token")));
+                    session.close();
+                    return;
                 }
+            } else {
+                log.warn("WebSocket 无 query 参数，拒绝连接: sessionId={}", session.getId());
+                sendJson(session, Map.of("type", "error", "payload", Map.of("message", "未提供认证Token")));
+                session.close();
+                return;
             }
         } catch (Exception e) {
-            log.warn("WebSocket 用户认证失败: sessionId={}, error={}, class={}", session.getId(), e.getMessage(), e.getClass().getName());
+            log.warn("WebSocket 用户认证失败，拒绝连接: sessionId={}, error={}", session.getId(), e.getMessage());
+            sendJson(session, Map.of("type", "error", "payload", Map.of("message", "Token已过期或无效，请重新登录")));
+            try { session.close(); } catch (Exception ignored) {}
+            return;
         }
 
         log.info("前端 WebSocket 连接建立: sessionId={}", session.getId());
@@ -140,7 +153,12 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
                                 "sessionId", sessionId,
                                 "payload", Map.of("text", result.getText(), "isFinal", true)));
 
-                        Long userId = userIdMap.getOrDefault(wsId, 1L);
+                        Long userId = userIdMap.get(wsId);
+                        if (userId == null) {
+                            sendJson(session, Map.of("type", "error", "sessionId", sessionId,
+                                    "payload", Map.of("message", "用户认证已失效，请重新登录")));
+                            return;
+                        }
                         Map<String, Object> commandResult = voiceCommandService.processTextCommand(userId, result.getText());
                         sendJson(session, Map.of(
                                 "type", "final_result",
@@ -253,7 +271,12 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
                 "sessionId", sessionId,
                 "payload", Map.of("text", recognizedText, "isFinal", true)));
 
-        Long userId = userIdMap.getOrDefault(session.getId(), 1L);
+        Long userId = userIdMap.get(session.getId());
+        if (userId == null) {
+            sendJson(session, Map.of("type", "error", "sessionId", sessionId,
+                    "payload", Map.of("message", "用户认证已失效，请重新登录")));
+            return;
+        }
         Map<String, Object> commandResult = voiceCommandService.processTextCommand(userId, recognizedText);
         sendJson(session, Map.of(
                 "type", "final_result",

@@ -246,23 +246,50 @@ function handleVoiceConfirm() {
 
   if (!intent) return
 
-  if (intent.action === 'query') {
-    // 查询意图：展示查询结果弹窗
-    queryEvents.value = intent.events || []
-    queryDate.value = intent.queryDate || ''
-    queryResponseText.value = intent.responseText || ''
-    queryResultOpen.value = true
-    // TTS 播报
-    if (intent.responseText) {
-      speak(intent.responseText)
-    }
-  } else if (intent.title) {
-    // 创建意图：打开事件表单
-    editingEvent.value = null
-    formInitialDate.value = selectedDate.value
-    formInitialTitle.value = intent.title
-    eventFormOpen.value = true
-    speak(`好的，已为你创建日程：${intent.title}`)
+  switch (intent.action) {
+    case 'query':
+      // 查询意图：展示查询结果弹窗
+      queryEvents.value = intent.events || []
+      queryDate.value = intent.queryDate || ''
+      queryResponseText.value = intent.responseText || ''
+      queryResultOpen.value = true
+      if (intent.responseText) {
+        speak(intent.responseText)
+      }
+      break
+
+    case 'create':
+      if (intent.title) {
+        editingEvent.value = null
+        formInitialDate.value = selectedDate.value
+        formInitialTitle.value = intent.title
+        eventFormOpen.value = true
+        speak(`好的，已为你创建日程：${intent.title}`)
+      }
+      break
+
+    case 'clarify':
+      // 澄清意图：重新打开语音面板让用户补充
+      if (intent.clarifyQuestion) {
+        speak(intent.clarifyQuestion)
+        // 延迟重新打开语音面板
+        setTimeout(() => openOverlay(), 1500)
+      }
+      break
+
+    case 'unknown':
+      // 未知意图：播报提示
+      if (intent.responseText) {
+        speak(intent.responseText)
+      }
+      break
+
+    default:
+      // update/delete/reminder 等暂未实现的意图
+      if (intent.responseText) {
+        speak(intent.responseText)
+      }
+      break
   }
 }
 

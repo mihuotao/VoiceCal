@@ -12,8 +12,9 @@ export type WSState = 'idle' | 'connecting' | 'open' | 'closing' | 'closed'
  * - 指数退避重连策略
  * - 心跳保活机制
  * - 资源自动释放
+ * - 支持动态 URL（每次连接时刷新 token）
  */
-export function useWebSocket(url: string) {
+export function useWebSocket(defaultUrl?: string) {
   const state = ref<WSState>('idle')
   const reconnectCount = ref(0)
   const lastError = ref<string>('')
@@ -21,6 +22,11 @@ export function useWebSocket(url: string) {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+
+  // 动态 URL 提供函数：每次连接时调用，获取最新 URL（含最新 token）
+  let urlProvider: (() => string) | null = null
+  // 最近一次使用的 URL（用于重连）
+  let lastUrl: string = defaultUrl || ''
 
   let onMessageHandler: ((data: string) => void) | null = null
   let onBinaryMessageHandler: ((data: ArrayBuffer) => void) | null = null
@@ -73,9 +79,19 @@ export function useWebSocket(url: string) {
    */
   function getReconnectDelay(): number {
     const delay = config.baseReconnectDelay * Math.pow(2, reconnectCount.value)
-    // 添加随机抖动，避免重连风暴
     const jitter = Math.random() * 1000
     return Math.min(delay + jitter, config.maxReconnectDelay)
+  }
+
+  /**
+   * 获取当前应使用的 URL
+   * 优先使用 urlProvider（动态 URL），否则用默认 URL
+   */
+  function getCurrentUrl(): string {
+    if (urlProvider) {
+      return urlProvider()
+    }
+    return defaultUrl || lastUrl
   }
 
   /**
@@ -115,14 +131,32 @@ export function useWebSocket(url: string) {
   }
 
   /**
-   * 建立连接
+   * 设置动态 URL 提供函数
+   * 每次 connect() 时会调用此函数获取最新 URL
    */
-  function connect() {
+  function setUrlProvider(provider: () => string) {
+    urlProvider = provider
+  }
+
+  /**
+   * 建立连接
+   * @param url 可选的连接 URL，不传则使用 urlProvider 或 defaultUrl
+   */
+  function connect(url?: string) {
     // 如果已经连接或正在连接，忽略
     if (state.value === 'open' || state.value === 'connecting') {
       console.log('WS: 已连接或正在连接，忽略')
       return
     }
+
+    // 确定连接 URL
+    const connectUrl = url || getCurrentUrl()
+    if (!connectUrl) {
+      console.error('WS: 无可用 URL')
+      lastError.value = '无可用连接地址'
+      return
+    }
+    lastUrl = connectUrl
 
     // 关闭现有连接
     if (ws) {
@@ -133,12 +167,12 @@ export function useWebSocket(url: string) {
     lastError.value = ''
 
     try {
-      ws = new WebSocket(url)
+      ws = new WebSocket(connectUrl)
       ws.binaryType = 'arraybuffer'
 
       ws.onopen = () => {
         transitionTo('open')
-        reconnectCount.value = 0  // 重置重连计数
+        reconnectCount.value = 0
         startHeartbeat()
       }
 
@@ -146,15 +180,13 @@ export function useWebSocket(url: string) {
         stopHeartbeat()
 
         if (state.value === 'closing') {
-          // 主动关闭，不重连
           transitionTo('closed')
           return
         }
 
-        // 非正常关闭
         transitionTo('closed')
 
-        if (event.code !== 1000) {  // 非正常关闭码
+        if (event.code !== 1000) {
           lastError.value = event.reason || '连接关闭'
           attemptReconnect()
         }
@@ -163,7 +195,6 @@ export function useWebSocket(url: string) {
       ws.onerror = (event) => {
         console.error('WS: 连接错误', event)
         lastError.value = '连接错误'
-        // onclose 会随后触发
       }
 
       ws.onmessage = (evt) => {
@@ -182,7 +213,7 @@ export function useWebSocket(url: string) {
   }
 
   /**
-   * 尝试重连
+   * 尝试重连（使用最新 URL）
    */
   function attemptReconnect() {
     if (reconnectCount.value >= config.maxReconnectAttempts) {
@@ -197,6 +228,7 @@ export function useWebSocket(url: string) {
     clearReconnectTimer()
     reconnectTimer = setTimeout(() => {
       if (state.value === 'closed') {
+        // 重连时使用最新 URL（可能包含新 token）
         connect()
       }
     }, delay)
@@ -210,7 +242,6 @@ export function useWebSocket(url: string) {
     stopHeartbeat()
 
     if (ws) {
-      // 移除事件监听，防止触发重连
       ws.onopen = null
       ws.onclose = null
       ws.onerror = null
@@ -229,7 +260,6 @@ export function useWebSocket(url: string) {
   function disconnect() {
     console.log('WS: 主动断开连接')
 
-    // 阻止自动重连
     clearReconnectTimer()
     reconnectCount.value = config.maxReconnectAttempts
 
@@ -281,7 +311,7 @@ export function useWebSocket(url: string) {
   }
 
   /**
-   * 重置重连计数（允许重新重连）
+   * 重置重连计数
    */
   function resetReconnect() {
     reconnectCount.value = 0
@@ -306,6 +336,7 @@ export function useWebSocket(url: string) {
     onBinaryMessage,
     onStateChange,
     resetReconnect,
+    setUrlProvider,
     isConnected: () => state.value === 'open',
   }
 }
