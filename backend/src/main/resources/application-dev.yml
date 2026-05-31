@@ -1,4 +1,4 @@
-spring:
+春天:
   datasource:
     url: jdbc:mysql://localhost:3306/voice_calendar?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
@@ -15,9 +15,9 @@ baidu:
   voice:
     app-id: 123514570
     api-key: 664pqoYLPjCCIBOlhOiHyrVU
-    secret-key: JvfWD5KPWlnOLjrc41yt66gaDRkflV1n
+    secret-key: 密码
 
 deepseek:
   api-url: https://api.deepseek.com/chat/completions
-  api-key: sk-e8485c92cd9d4e089c480442821d27b6
+  api-key: 密码
   model: deepseek-v4-pro
