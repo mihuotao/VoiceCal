@@ -29,7 +29,7 @@ function isTokenExpired(): boolean {
 const TARGET_SAMPLE_RATE = 16000
 const BUFFER_SIZE = 2048
 const SILENCE_TIMEOUT_MS = 2000
-const ASR_TIMEOUT_MS = 8000
+const ASR_TIMEOUT_MS = 30000
 const VAD_THRESHOLD = 0.025
 
 /**
@@ -46,6 +46,9 @@ export function useVoice() {
   const partialText = ref('')
   const errorMessage = ref('')
   const parsedIntent = ref<ParsedIntent | null>(null)
+
+  // 多轮对话上下文
+  let pendingContext: Record<string, unknown> | null = null
 
   // 音频资源引用
   let audioContext: AudioContext | null = null
@@ -240,8 +243,10 @@ export function useVoice() {
 
           case 'intermediate_result':
             if (msg.payload?.isFinal) {
+              // 收到最终识别结果，保存文本
               transcript.value = msg.payload.text || ''
               partialText.value = ''
+              console.log('ASR 最终识别结果:', transcript.value)
             } else {
               if (status.value === 'result' || status.value === 'idle') return
               partialText.value = msg.payload?.text || ''
@@ -261,6 +266,14 @@ export function useVoice() {
                 clarifyQuestion: msg.payload.clarifyQuestion,
                 confidence: msg.payload?.confidence || 0.3
               }
+              // 保存上下文用于多轮对话
+              if (msg.payload?.action?.missingField) {
+                pendingContext = {
+                  waitingFor: 'clarify',
+                  missingField: msg.payload.action.missingField,
+                  partialEntities: msg.payload.action.partialEntities || {}
+                }
+              }
               transitionTo('result')
               break
             }
@@ -278,6 +291,46 @@ export function useVoice() {
                   responseText: msg.payload?.responseText || '',
                   confidence: msg.payload?.confidence || 0.9
                 }
+              } else if (actionType === 'preview') {
+                // 预览意图：返回事件数据供前端显示表单
+                parsedIntent.value = {
+                  action: 'preview',
+                  event: msg.payload.action.event || {},
+                  responseText: msg.payload?.responseText || '已为您准备好事件信息，请确认后创建',
+                  confidence: msg.payload?.confidence || 0.9
+                }
+              } else if (actionType === 'created') {
+                // 创建成功
+                parsedIntent.value = {
+                  action: 'created',
+                  event: msg.payload.action.event || {},
+                  responseText: msg.payload?.responseText || '事件已创建',
+                  confidence: msg.payload?.confidence || 0.9
+                }
+                pendingContext = null // 清除上下文
+              } else if (actionType === 'clarify') {
+                // 缺失字段追问
+                parsedIntent.value = {
+                  action: 'clarify',
+                  clarifyQuestion: msg.payload?.responseText || '请补充信息',
+                  missingField: msg.payload?.action?.missingField || '',
+                  confidence: msg.payload?.confidence || 0.5
+                }
+                // 保存上下文
+                pendingContext = {
+                  waitingFor: 'clarify',
+                  missingField: msg.payload?.action?.missingField || '',
+                  partialEntities: msg.payload?.action?.partialEntities || {}
+                }
+              } else if (actionType === 'conflict') {
+                // 时间冲突
+                parsedIntent.value = {
+                  action: 'conflict',
+                  event: msg.payload.action.event || {},
+                  conflicts: msg.payload.action.conflicts || [],
+                  responseText: msg.payload?.responseText || '该时段已有安排',
+                  confidence: msg.payload?.confidence || 0.9
+                }
               } else if (actionType === 'unknown') {
                 // 未知意图
                 parsedIntent.value = {
@@ -286,7 +339,7 @@ export function useVoice() {
                   confidence: msg.payload?.confidence || 0.3
                 }
               } else {
-                // 创建/更新/删除/提醒意图
+                // 其他意图（preview 等）
                 parsedIntent.value = {
                   action: actionType || 'create',
                   title: msg.payload?.action?.event?.title || msg.payload?.title || transcript.value,
@@ -550,6 +603,20 @@ export function useVoice() {
     closeOverlay()
   }
 
+  /**
+   * 获取待处理上下文（用于多轮对话）
+   */
+  function getPendingContext(): Record<string, unknown> | null {
+    return pendingContext
+  }
+
+  /**
+   * 清除待处理上下文
+   */
+  function clearPendingContext() {
+    pendingContext = null
+  }
+
   return {
     status,
     amplitude,
@@ -562,6 +629,8 @@ export function useVoice() {
     stopRecording,
     openOverlay,
     closeOverlay,
-    cleanup
+    cleanup,
+    getPendingContext,
+    clearPendingContext
   }
 }

@@ -61,7 +61,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResult<Void> handleNotReadable(HttpMessageNotReadableException e) {
-        return ApiResult.badRequest("请求体格式错误");
+        log.error("请求体解析失败: {}", e.getMessage());
+        return ApiResult.badRequest("请求体格式错误: " + e.getMessage());
     }
 
     @ExceptionHandler(DuplicateKeyException.class)

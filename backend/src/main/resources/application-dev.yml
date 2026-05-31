@@ -16,3 +16,8 @@ baidu:
     app-id: 123514570
     api-key: 664pqoYLPjCCIBOlhOiHyrVU
     secret-key: JvfWD5KPWlnOLjrc41yt66gaDRkflV1n
+
+deepseek:
+  api-url: https://api.deepseek.com/chat/completions
+  api-key: sk-e8485c92cd9d4e089c480442821d27b6
+  model: deepseek-v4-pro

@@ -8,7 +8,11 @@ import com.voicecal.entity.FestivalGreetingLog;
 import com.voicecal.entity.VoiceCommandLog;
 import com.voicecal.mapper.FestivalMapper;
 import com.voicecal.mapper.FestivalGreetingLogMapper;
+import com.voicecal.model.dto.CreateEventRequest;
+import com.voicecal.model.dto.CreateReminderRequest;
+import com.voicecal.model.dto.UpdateEventRequest;
 import com.voicecal.service.EventService;
+import com.voicecal.service.ReminderService;
 import com.voicecal.service.VoiceCommandLogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +37,8 @@ public class VoiceCommandService {
     private final BaiduTtsService ttsService;
     private final VoiceNluService nluService;
     private final EventService eventService;
+    private final ReminderService reminderService;
+    private final CreateEventBuilder createEventBuilder;
     private final FestivalMapper festivalMapper;
     private final FestivalGreetingLogMapper greetingLogMapper;
     private final VoiceCommandLogService voiceCommandLogService;
@@ -42,6 +48,8 @@ public class VoiceCommandService {
                                 BaiduTtsService ttsService,
                                 VoiceNluService nluService,
                                 EventService eventService,
+                                ReminderService reminderService,
+                                CreateEventBuilder createEventBuilder,
                                 FestivalMapper festivalMapper,
                                 FestivalGreetingLogMapper greetingLogMapper,
                                 VoiceCommandLogService voiceCommandLogService,
@@ -50,6 +58,8 @@ public class VoiceCommandService {
         this.ttsService = ttsService;
         this.nluService = nluService;
         this.eventService = eventService;
+        this.reminderService = reminderService;
+        this.createEventBuilder = createEventBuilder;
         this.festivalMapper = festivalMapper;
         this.greetingLogMapper = greetingLogMapper;
         this.voiceCommandLogService = voiceCommandLogService;
@@ -74,9 +84,20 @@ public class VoiceCommandService {
         try {
             switch (nluResult.getIntent()) {
                 case "CREATE" -> {
-                    var req = buildCreateRequest(nluResult);
-                    response.put("action", Map.of("type", "preview", "event", req));
-                    responseText = "已为您创建事件「" + req.get("title") + "」";
+                    // 构建预览数据
+                    Map<String, Object> preview = createEventBuilder.buildPreviewMap(nluResult);
+
+                    // 返回预览，让前端弹出表单让用户确认
+                    response.put("action", Map.of(
+                            "type", "preview",
+                            "event", preview
+                    ));
+
+                    // 构建提示文本
+                    String title = (String) preview.getOrDefault("title", "新事件");
+                    String dateStr = (String) preview.getOrDefault("date", "");
+                    String startTimeStr = (String) preview.getOrDefault("startTime", "");
+                    responseText = "已为您准备好事件「" + title + "」的信息，请确认后创建";
                 }
                 case "QUERY" -> {
                     Map<String, Object> queryResult = handleQuery(userId, nluResult);
@@ -89,13 +110,43 @@ public class VoiceCommandService {
                     responseText = (String) queryResult.get("responseText");
                 }
                 case "UPDATE" -> {
-                    responseText = "好的，已为您更新事件";
+                    responseText = "修改功能暂未开放";
+                    response.put("action", Map.of("type", "unknown"));
                 }
                 case "DELETE" -> {
-                    responseText = "好的，已为您删除事件";
+                    responseText = "删除功能暂未开放";
+                    response.put("action", Map.of("type", "unknown"));
                 }
                 case "REMINDER" -> {
-                    responseText = "好的，已为您设置提醒";
+                    // 提取实体
+                    String title = (String) nluResult.getEntities().get("title");
+                    String dateStr = (String) nluResult.getEntities().get("date");
+                    String startTimeStr = (String) nluResult.getEntities().get("startTime");
+
+                    if (title == null || title.isBlank()) {
+                        title = "提醒事项";
+                    }
+
+                    // 创建事件
+                    LocalDate reminderDate = dateStr != null ? LocalDate.parse(dateStr) : LocalDate.now().plusDays(1);
+                    LocalTime reminderTime = startTimeStr != null ? LocalTime.parse(startTimeStr) : LocalTime.of(9, 0);
+
+                    CreateEventRequest eventReq = new CreateEventRequest();
+                    eventReq.setTitle(title);
+                    eventReq.setStartTime(reminderDate.atTime(reminderTime));
+                    eventReq.setEndTime(reminderDate.atTime(reminderTime).plusHours(1));
+                    eventReq.setCategory("personal");
+                    CalendarEvent event = eventService.create(userId, eventReq);
+
+                    // 创建提醒
+                    CreateReminderRequest reminderReq = new CreateReminderRequest();
+                    reminderReq.setRemindAt(event.getStartTime().minusMinutes(15));
+                    reminderReq.setRemindMinutesBefore(15);
+                    reminderReq.setMethod("browser");
+                    reminderService.create(event.getId(), userId, reminderReq);
+
+                    response.put("action", Map.of("type", "reminder_created", "event", toEventMap(event)));
+                    responseText = "已创建事件「" + title + "」并设置提醒";
                 }
                 default -> {
                     commandResult = "failed";
@@ -356,6 +407,144 @@ public class VoiceCommandService {
         req.put("endTime", d.atTime(et).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         return req;
+    }
+
+    /**
+     * 处理带上下文的语音命令（多轮对话）
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> processTextCommandWithContext(
+            Long userId, String text, Map<String, Object> context) {
+        if (context != null && "clarify".equals(context.get("waitingFor"))) {
+            String missingField = (String) context.get("missingField");
+            Map<String, Object> partialEntities = (Map<String, Object>) context.get("partialEntities");
+
+            NluResult parsed = nluService.parse(text);
+            Object filledVal = parsed.getEntities().get(missingField);
+
+            if (filledVal != null) {
+                partialEntities.put(missingField, filledVal);
+                NluResult merged = new NluResult(text, "CREATE", 0.9, "context");
+                merged.setEntities(partialEntities);
+                return processWithNluResult(userId, merged);
+            }
+        }
+        return processTextCommand(userId, text);
+    }
+
+    /**
+     * 使用已有的 NluResult 处理命令
+     */
+    private Map<String, Object> processWithNluResult(Long userId, NluResult nluResult) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("text", nluResult.getRawText());
+        response.put("intent", nluResult.getIntent());
+        response.put("entities", nluResult.getEntities());
+        response.put("confidence", nluResult.getConfidence());
+        response.put("nluSource", nluResult.getNluSource());
+
+        String commandResult = "success";
+        String responseText;
+        try {
+            if ("CREATE".equals(nluResult.getIntent())) {
+                List<String> missingFields = createEventBuilder.getMissingFields(nluResult);
+                if (!missingFields.isEmpty()) {
+                    String question = createEventBuilder.generateClarifyQuestion(missingFields.get(0));
+                    response.put("action", Map.of(
+                            "type", "clarify",
+                            "missingField", missingFields.get(0),
+                            "partialEntities", nluResult.getEntities()
+                    ));
+                    responseText = question;
+                } else {
+                    var req = createEventBuilder.build(nluResult);
+                    List<CalendarEvent> conflicts = eventService.findConflicts(
+                            userId, req.getStartTime(), req.getEndTime());
+                    if (!conflicts.isEmpty()) {
+                        String conflictInfo = buildConflictInfo(conflicts);
+                        response.put("action", Map.of(
+                                "type", "conflict",
+                                "event", createEventBuilder.buildPreviewMap(nluResult),
+                                "conflicts", conflicts.stream().map(this::toEventMap).toList()
+                        ));
+                        responseText = "该时段已有安排：" + conflictInfo + "，是否仍要创建？";
+                    } else {
+                        CalendarEvent event = eventService.create(userId, req);
+                        response.put("action", Map.of("type", "created", "event", toEventMap(event)));
+                        responseText = "已为您创建事件「" + event.getTitle() + "」";
+                    }
+                }
+            } else {
+                return processTextCommand(userId, nluResult.getRawText());
+            }
+        } catch (Exception e) {
+            commandResult = "failed";
+            responseText = "处理失败，请重试";
+            log.error("语音命令处理失败: userId={}", userId, e);
+        }
+
+        response.put("responseText", responseText);
+        return response;
+    }
+
+    /**
+     * 将 CalendarEvent 转为 Map
+     */
+    private Map<String, Object> toEventMap(CalendarEvent event) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", event.getId());
+        map.put("title", event.getTitle());
+        map.put("description", event.getDescription());
+        map.put("startTime", event.getStartTime() != null
+                ? event.getStartTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null);
+        map.put("endTime", event.getEndTime() != null
+                ? event.getEndTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null);
+        map.put("allDay", event.getAllDay());
+        map.put("location", event.getLocation());
+        map.put("color", event.getColor());
+        map.put("category", event.getCategory());
+        map.put("priority", event.getPriority());
+        map.put("status", event.getStatus());
+        return map;
+    }
+
+    /**
+     * 构建冲突信息文本
+     */
+    private String buildConflictInfo(List<CalendarEvent> conflicts) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < conflicts.size(); i++) {
+            CalendarEvent ev = conflicts.get(i);
+            if (i > 0) sb.append("、");
+            sb.append("「").append(ev.getTitle()).append("」");
+            if (ev.getStartTime() != null) {
+                sb.append(formatTime(ev.getStartTime())).append("-");
+                sb.append(formatTime(ev.getEndTime()));
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 格式化日期
+     */
+    private String formatDate(java.time.LocalDateTime dateTime) {
+        if (dateTime == null) return "";
+        LocalDate today = LocalDate.now();
+        LocalDate date = dateTime.toLocalDate();
+        if (date.equals(today)) return "今天";
+        if (date.equals(today.plusDays(1))) return "明天";
+        if (date.equals(today.minusDays(1))) return "昨天";
+        return date.getMonthValue() + "月" + date.getDayOfMonth() + "号";
+    }
+
+    /**
+     * 格式化时间
+     */
+    private String formatTime(java.time.LocalDateTime dateTime) {
+        if (dateTime == null) return "";
+        LocalTime time = dateTime.toLocalTime();
+        return time.getHour() + "点" + (time.getMinute() > 0 ? time.getMinute() + "分" : "");
     }
 
 }

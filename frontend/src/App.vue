@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, watch } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import CalendarHeader from '@/components/calendar/CalendarHeader.vue'
 import CalendarGrid from '@/components/calendar/CalendarGrid.vue'
 import CalendarInfoBar from '@/components/calendar/CalendarInfoBar.vue'
@@ -13,6 +13,7 @@ import FestivalCard from '@/components/calendar/FestivalCard.vue'
 import FestivalDetail from '@/components/calendar/FestivalDetail.vue'
 import VoiceButton from '@/components/voice/VoiceButton.vue'
 import VoiceOverlay from '@/components/voice/VoiceOverlay.vue'
+import VoiceFunctionPanel from '@/components/voice/VoiceFunctionPanel.vue'
 import QueryResultPanel from '@/components/voice/QueryResultPanel.vue'
 import { useCalendar } from '@/composables/useCalendar'
 import { useVoice } from '@/composables/useVoice'
@@ -21,6 +22,7 @@ import { useAuth } from '@/composables/useAuth'
 import { usePreferences } from '@/composables/usePreferences'
 import { useFestival } from '@/composables/useFestival'
 import { useTts } from '@/composables/useTts'
+import request from '@/utils/request'
 import LoginPage from '@/components/auth/LoginPage.vue'
 import SettingsPanel from '@/components/settings/SettingsPanel.vue'
 import ProfilePanel from '@/components/profile/ProfilePanel.vue'
@@ -51,7 +53,8 @@ const {
     openOverlay,
     closeOverlay,
     startRecording,
-    stopRecording
+    stopRecording,
+    clearPendingContext
   } = useVoice()
 
 const {
@@ -61,7 +64,9 @@ const {
   createEvent,
   updateEvent,
   deleteEvent,
-  checkConflicts
+  checkConflicts,
+  startAutoRefresh,
+  stopAutoRefresh
 } = useEvents()
 
 const { isAuthenticated } = useAuth()
@@ -85,6 +90,11 @@ const eventDetailOpen = ref(false)
 const editingEvent = ref<CalendarEvent | null>(null)
 const formInitialDate = ref('')
 const formInitialTitle = ref('')
+const formInitialStartTime = ref('')
+const formInitialEndTime = ref('')
+const formInitialLocation = ref('')
+const formInitialCategory = ref('personal')
+const formInitialAllDay = ref(false)
 const selectedEvent = ref<CalendarEvent | null>(null)
 const conflicts = ref<CalendarEvent[]>([])
 
@@ -98,9 +108,19 @@ const queryResponseText = ref('')
 const festivalDetailOpen = ref(false)
 const selectedFestival = ref<any>(null)
 
+// 功能面板状态
+const functionPanelMode = ref('')
+const functionPanelTranscript = ref('')
+const functionPanelEntities = ref<Record<string, any> | null>(null)
+
 onMounted(() => {
   fetchEvents()
   fetchPreferences()
+  startAutoRefresh() // 启动自动刷新
+})
+
+onUnmounted(() => {
+  stopAutoRefresh() // 停止自动刷新
 })
 
 watch(isAuthenticated, (auth) => {
@@ -153,42 +173,36 @@ function openEditEvent(ev: CalendarEvent) {
 }
 
 async function handleSaveEvent(data: { title: string; description: string; date: string; startTime: string; endTime: string; allDay: boolean; location: string; color: string; category: string }) {
+  console.log('handleSaveEvent 收到数据:', data)
+
   const startTime = data.allDay
-    ? new Date(data.date + 'T00:00:00').toISOString()
-    : new Date(data.date + 'T' + data.startTime + ':00').toISOString()
+    ? `${data.date} 00:00:00`
+    : `${data.date} ${data.startTime}:00`
   const endTime = data.allDay
-    ? new Date(data.date + 'T23:59:59').toISOString()
-    : new Date(data.date + 'T' + data.endTime + ':00').toISOString()
+    ? `${data.date} 23:59:59`
+    : `${data.date} ${data.endTime}:00`
 
-  const eventConflicts = checkConflicts(startTime, endTime, editingEvent.value?.id)
-  conflicts.value = eventConflicts
+  console.log('构建的时间:', { startTime, endTime })
 
-  if (eventConflicts.length > 0) return
-
-  if (editingEvent.value) {
-    await updateEvent(editingEvent.value.id, {
-      title: data.title,
-      description: data.description,
-      startTime,
-      endTime,
-      allDay: data.allDay,
-      location: data.location,
-      color: data.color,
-      category: data.category
-    })
-  } else {
-    await createEvent({
-      title: data.title,
-      description: data.description,
-      startTime,
-      endTime,
-      allDay: data.allDay,
-      location: data.location,
-      color: data.color,
-      category: data.category
-    })
+  const eventData = {
+    title: data.title,
+    description: data.description,
+    startTime,
+    endTime,
+    allDay: data.allDay,
+    location: data.location,
+    color: data.color,
+    category: data.category
   }
-  eventFormOpen.value = false
+  console.log('发送创建请求:', eventData)
+
+  const result = await createEvent(eventData)
+  console.log('创建结果:', result)
+
+  if (result) {
+    eventFormOpen.value = false
+    await fetchEvents()
+  }
 }
 
 function handleDeleteEvent(id: number) {
@@ -258,6 +272,24 @@ function handleVoiceConfirm() {
       }
       break
 
+    case 'created':
+      // 创建成功：显示成功提示、TTS 播报、刷新日历
+      if (intent.responseText) {
+        speak(intent.responseText)
+      }
+      // 刷新日历事件列表
+      fetchEvents()
+      clearPendingContext()
+      break
+
+    case 'conflict':
+      // 时间冲突：显示冲突提示，让用户确认
+      if (intent.responseText) {
+        speak(intent.responseText)
+      }
+      // 可以打开冲突面板或直接提示
+      break
+
     case 'create':
       if (intent.title) {
         editingEvent.value = null
@@ -290,6 +322,156 @@ function handleVoiceConfirm() {
         speak(intent.responseText)
       }
       break
+  }
+}
+
+function handleOpenForm() {
+  const intent = parsedIntent.value
+  closeOverlay()
+
+  if (!intent || intent.action !== 'preview') return
+
+  // 从预览数据中获取事件信息
+  const eventData = intent.event as Record<string, any> || {}
+
+  // 预填充表单字段
+  editingEvent.value = null
+  formInitialDate.value = (eventData.date as string) || selectedDate.value
+  formInitialTitle.value = (eventData.title as string) || intent.title || ''
+  formInitialStartTime.value = (eventData.startTime as string) || ''
+  formInitialEndTime.value = (eventData.endTime as string) || ''
+  formInitialLocation.value = (eventData.location as string) || ''
+  formInitialCategory.value = (eventData.category as string) || 'personal'
+  formInitialAllDay.value = (eventData.allDay as boolean) || false
+
+  // 打开表单
+  eventFormOpen.value = true
+
+  // TTS 播报
+  speak('已为您准备好事件信息，请确认后创建')
+}
+
+// 功能面板处理函数
+function handleFunctionPanelSelectMode(mode: string) {
+  functionPanelMode.value = mode
+  functionPanelTranscript.value = ''
+  functionPanelEntities.value = null
+}
+
+async function handleFunctionPanelExecute() {
+  if (!functionPanelMode.value || !functionPanelEntities.value) return
+
+  const mode = functionPanelMode.value
+  const entities = functionPanelEntities.value
+
+  if (mode === 'CREATE') {
+    // 创建模式：直接调用创建接口
+    try {
+      const eventDate = entities.date || selectedDate.value
+      const eventData: any = {
+        title: entities.title || '新事件',
+        startTime: `${eventDate} ${entities.startTime || '09:00'}:00`,
+        endTime: `${eventDate} ${entities.endTime || '10:00'}:00`
+      }
+      // 可选字段
+      if (entities.location) eventData.location = entities.location
+      if (entities.category) eventData.category = entities.category
+      if (entities.allDay !== undefined) eventData.allDay = entities.allDay
+      if (entities.description) eventData.description = entities.description
+      if (entities.color) eventData.color = entities.color
+      if (entities.priority !== undefined) eventData.priority = entities.priority
+
+      console.log('创建事件:', eventData)
+      const result: any = await request.post('/events', eventData)
+      console.log('创建结果:', result)
+      if (result.code === 201) {
+        fetchEvents()
+        speak(`已创建事件「${eventData.title}」`)
+      } else {
+        speak('创建失败，请重试')
+      }
+    } catch (error) {
+      console.error('创建失败:', error)
+      speak('创建失败，请重试')
+    }
+  } else if (mode === 'QUERY') {
+    // 查询模式：直接调用查询接口
+    try {
+      const queryDate = entities.date || new Date().toISOString().slice(0, 10)
+      const result: any = await request.get('/events', {
+        params: {
+          startDate: queryDate,
+          endDate: queryDate
+        }
+      })
+      if (result.code === 200) {
+        const events = result.data?.records || []
+        queryEvents.value = events
+        queryDate.value = queryDate
+        queryResponseText.value = `找到 ${events.length} 个事件`
+        queryResultOpen.value = true
+        speak(`找到 ${events.length} 个事件`)
+      }
+    } catch (error) {
+      console.error('查询失败:', error)
+      speak('查询失败，请重试')
+    }
+  } else if (mode === 'UPDATE') {
+    // 修改模式：直接调用更新接口
+    try {
+      // 1. 先查询事件
+      const queryDate = entities.date || new Date().toISOString().slice(0, 10)
+      const queryResult: any = await request.get('/events', {
+        params: {
+          startDate: queryDate,
+          endDate: queryDate
+        }
+      })
+
+      if (queryResult.code === 200) {
+        const events = queryResult.data?.records || []
+        queryEvents.value = events
+        queryDate.value = queryDate
+        queryResponseText.value = `找到 ${events.length} 个事件`
+        queryResultOpen.value = true
+        speak(`找到 ${events.length} 个事件`)
+      }
+    } catch (error) {
+      console.error('查询失败:', error)
+      speak('查询失败，请重试')
+    }
+  }
+
+  // 清除状态
+  functionPanelEntities.value = null
+  functionPanelTranscript.value = ''
+}
+
+// 监听语音识别结果 - 当语音识别完成时自动提取实体
+watch(parsedIntent, (intent) => {
+  if (!intent || !functionPanelMode.value) return
+
+  // 语音识别完成后，调用 LLM 提取实体
+  if (intent.action === 'preview' || intent.action === 'query' || intent.action === 'unknown') {
+    const text = transcript.value
+    if (text) {
+      functionPanelTranscript.value = text
+      extractEntitiesFromText(functionPanelMode.value, text)
+    }
+  }
+})
+
+async function extractEntitiesFromText(intent: string, text: string) {
+  try {
+    const result: any = await request.post('/voice/test/extract', { intent, text })
+    if (result.code === 200) {
+      const data = result.data
+      const entities = data.entities || data
+      console.log('提取的实体:', entities)
+      functionPanelEntities.value = entities
+    }
+  } catch (error) {
+    console.error('实体提取失败:', error)
   }
 }
 
@@ -385,6 +567,14 @@ function handleFestivalClick() {
           </div>
         </div>
 
+        <!-- 功能面板 -->
+        <VoiceFunctionPanel
+          :transcript="functionPanelTranscript"
+          :extracted-entities="functionPanelEntities"
+          @select-mode="handleFunctionPanelSelectMode"
+          @execute="handleFunctionPanelExecute"
+        />
+
         <div class="voice-center">
           <VoiceButton
             :status="status === 'listening' ? 'recording' : status === 'processing' ? 'processing' : 'idle'"
@@ -426,6 +616,7 @@ function handleFestivalClick() {
       @stop-record="stopRecording"
       @retry="startRecording"
       @edit-result="closeOverlay"
+      @open-form="handleOpenForm"
     />
 
     <QueryResultPanel
@@ -447,6 +638,11 @@ function handleFestivalClick() {
       :event="editingEvent"
       :initial-date="formInitialDate"
       :initial-title="formInitialTitle"
+      :initial-start-time="formInitialStartTime"
+      :initial-end-time="formInitialEndTime"
+      :initial-location="formInitialLocation"
+      :initial-category="formInitialCategory"
+      :initial-all-day="formInitialAllDay"
       @close="eventFormOpen = false"
       @save="handleSaveEvent"
       @delete="handleDeleteEvent"

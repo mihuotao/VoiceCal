@@ -176,8 +176,8 @@ public class VoiceWebSocketHandler extends AbstractWebSocketHandler {
             }
         });
 
-        // 10s 超时，不阻塞 handleStart
-        CompletableFuture<String> timedFuture = baiduFuture.orTimeout(10, TimeUnit.SECONDS);
+        // 15s 超时，不阻塞 handleStart
+        CompletableFuture<String> timedFuture = baiduFuture.orTimeout(15, TimeUnit.SECONDS);
 
         timedFuture.whenComplete((baiduSid, throwable) -> {
             pendingBaiduSessions.remove(wsId);

@@ -34,12 +34,26 @@ public class VoiceCommandController {
 
     @PostMapping("/command")
     public ApiResult<?> processCommand(@CurrentUser LoginUser loginUser,
-                                        @Valid @RequestBody Map<String, String> body) {
-        String text = body.get("text");
-        if (text == null || text.isBlank()) {
+                                        @RequestBody Map<String, Object> body) {
+        Object textObj = body.get("text");
+        if (textObj == null || textObj.toString().isBlank()) {
             return ApiResult.badRequest("语音文本不能为空");
         }
-        var result = voiceCommandService.processTextCommand(loginUser.getUserId(), text);
+        String text = textObj.toString();
+
+        // 支持多轮对话上下文
+        Object contextObj = body.get("context");
+        Map<String, Object> context = null;
+        if (contextObj instanceof Map) {
+            context = (Map<String, Object>) contextObj;
+        }
+
+        Map<String, Object> result;
+        if (context != null && !context.isEmpty()) {
+            result = voiceCommandService.processTextCommandWithContext(loginUser.getUserId(), text, context);
+        } else {
+            result = voiceCommandService.processTextCommand(loginUser.getUserId(), text);
+        }
         return ApiResult.success(result);
     }
 

@@ -17,6 +17,7 @@ const confirmButtonText = computed(() => {
   switch (props.intent?.action) {
     case 'query': return '查看结果'
     case 'create': return '确认创建'
+    case 'preview': return '打开表单'
     case 'update': return '确认修改'
     case 'delete': return '确认删除'
     case 'reminder': return '确认提醒'
@@ -31,10 +32,13 @@ const emit = defineEmits<{
   edit: []
   retry: []
   close: []
+  openForm: []
 }>()
 
 const actionLabel: Record<string, string> = {
   create: '创建日程',
+  created: '创建成功',
+  preview: '准备创建',
   query: '查询日程',
   update: '更新日程',
   delete: '删除日程',
@@ -93,6 +97,39 @@ const actionLabel: Record<string, string> = {
         <span class="voice-result__field-label">系统回复</span>
         <span class="voice-result__field-value">{{ intent.responseText }}</span>
       </div>
+
+      <!-- 预览卡片：显示识别到的事件信息 -->
+      <div v-if="intent.action === 'preview' && intent.event" class="voice-result__preview">
+        <div class="voice-result__preview-header">
+          <span class="voice-result__preview-icon">📅</span>
+          <span class="voice-result__preview-title">识别到的事件信息</span>
+        </div>
+        <div class="voice-result__preview-content">
+          <div v-if="intent.event.title" class="voice-result__preview-item">
+            <span class="voice-result__preview-label">标题</span>
+            <span class="voice-result__preview-value">{{ intent.event.title }}</span>
+          </div>
+          <div v-if="intent.event.date" class="voice-result__preview-item">
+            <span class="voice-result__preview-label">日期</span>
+            <span class="voice-result__preview-value">{{ intent.event.date }}</span>
+          </div>
+          <div v-if="intent.event.startTime" class="voice-result__preview-item">
+            <span class="voice-result__preview-label">时间</span>
+            <span class="voice-result__preview-value">{{ intent.event.startTime }} - {{ intent.event.endTime }}</span>
+          </div>
+          <div v-if="intent.event.location" class="voice-result__preview-item">
+            <span class="voice-result__preview-label">地点</span>
+            <span class="voice-result__preview-value">{{ intent.event.location }}</span>
+          </div>
+          <div v-if="intent.event.category" class="voice-result__preview-item">
+            <span class="voice-result__preview-label">分类</span>
+            <span class="voice-result__preview-value">{{ intent.event.category }}</span>
+          </div>
+        </div>
+        <div class="voice-result__preview-hint">
+          点击下方按钮打开表单，确认后创建事件
+        </div>
+      </div>
     </div>
 
     <div class="voice-result__actions">
@@ -106,7 +143,7 @@ const actionLabel: Record<string, string> = {
         重新录音
       </motion.button>
       <motion.button
-        v-if="intent?.action !== 'unknown' && intent?.action !== 'clarify'"
+        v-if="intent?.action !== 'unknown' && intent?.action !== 'clarify' && intent?.action !== 'preview'"
         class="voice-result__btn voice-result__btn--secondary"
         :while-hover="{ scale: 1.04 }"
         :while-tap="{ scale: 0.97 }"
@@ -116,6 +153,14 @@ const actionLabel: Record<string, string> = {
         编辑
       </motion.button>
       <GlassButton
+        v-if="intent?.action === 'preview'"
+        variant="primary"
+        @click="emit('openForm')"
+      >
+        {{ confirmButtonText }}
+      </GlassButton>
+      <GlassButton
+        v-else
         variant="primary"
         @click="emit('confirm')"
       >
@@ -266,6 +311,67 @@ const actionLabel: Record<string, string> = {
       background: rgba(255, 255, 255, 0.12);
       color: $color-text-primary;
     }
+  }
+
+  &__preview {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: $radius-md;
+    padding: $space-4;
+    margin-top: $space-2;
+  }
+
+  &__preview-header {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-3;
+    padding-bottom: $space-2;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  &__preview-icon {
+    font-size: 18px;
+  }
+
+  &__preview-title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text-primary;
+  }
+
+  &__preview-content {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__preview-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+  }
+
+  &__preview-label {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    min-width: 40px;
+  }
+
+  &__preview-value {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    font-weight: $font-weight-medium;
+  }
+
+  &__preview-hint {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: $space-3;
+    padding-top: $space-2;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    text-align: center;
   }
 }
 </style>

@@ -1,16 +1,15 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import request from '@/utils/request'
-import type { ApiResponse } from '@/types/api'
 import type { CalendarEvent, EventCreateRequest } from '@/types/event'
 
 const API_BASE = '/events'
-
-let nextId = 1
+const AUTO_REFRESH_INTERVAL = 5000 // 5秒自动刷新
 
 export function useEvents() {
   const events = ref<CalendarEvent[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  let refreshTimer: ReturnType<typeof setInterval> | null = null
 
   const eventsByDate = computed(() => {
     const map: Record<string, CalendarEvent[]> = {}
@@ -35,12 +34,12 @@ export function useEvents() {
       const params: Record<string, string> = {}
       if (start) params.start = start
       if (end) params.end = end
-      const res = await request.get<ApiResponse<CalendarEvent[]>>(API_BASE, { params })
-      events.value = res.data
-    } catch {
-      if (events.value.length === 0) {
-        seedMockEvents()
+      const res: any = await request.get(API_BASE, { params })
+      if (res.code === 200) {
+        events.value = res.data || []
       }
+    } catch (err) {
+      console.error('获取事件失败:', err)
     } finally {
       loading.value = false
     }
@@ -48,86 +47,77 @@ export function useEvents() {
 
   async function createEvent(req: EventCreateRequest): Promise<CalendarEvent | null> {
     try {
-      const res = await request.post<ApiResponse<CalendarEvent>>(API_BASE, req)
-      events.value.push(res.data)
-      return res.data
-    } catch {
-      const mock: CalendarEvent = {
-        id: nextId++,
-        userId: 1,
-        title: req.title,
-        description: req.description,
-        startTime: req.startTime,
-        endTime: req.endTime,
-        allDay: req.allDay,
-        location: req.location,
-        category: req.category,
-        color: req.color,
-        priority: req.priority
+      const res: any = await request.post(API_BASE, req)
+      if (res.code === 201) {
+        events.value.push(res.data)
+        return res.data
       }
-      events.value.push(mock)
-      return mock
+      return null
+    } catch (err) {
+      console.error('创建事件失败:', err)
+      return null
     }
   }
 
   async function updateEvent(id: number, req: Partial<EventCreateRequest>): Promise<boolean> {
     try {
-      await request.put(`${API_BASE}/${id}`, req)
-      const idx = events.value.findIndex(e => e.id === id)
-      if (idx >= 0) Object.assign(events.value[idx], req)
-      return true
-    } catch {
-      const idx = events.value.findIndex(e => e.id === id)
-      if (idx >= 0) Object.assign(events.value[idx], req)
-      return true
+      const res: any = await request.put(`${API_BASE}/${id}`, req)
+      if (res.code === 200) {
+        await fetchEvents()
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('更新事件失败:', err)
+      return false
     }
   }
 
   async function deleteEvent(id: number): Promise<boolean> {
     try {
-      await request.delete(`${API_BASE}/${id}`)
-      events.value = events.value.filter(e => e.id !== id)
-      return true
-    } catch {
-      events.value = events.value.filter(e => e.id !== id)
-      return true
+      const res: any = await request.delete(`${API_BASE}/${id}`)
+      if (res.code === 200) {
+        events.value = events.value.filter(e => e.id !== id)
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('删除事件失败:', err)
+      return false
     }
   }
 
-  function seedMockEvents() {
-    const today = new Date()
-    const mocks: CalendarEvent[] = [
-      {
-        id: nextId++, userId: 1, title: '团队周会',
-        startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 10, 0).toISOString(),
-        endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 0).toISOString(),
-        color: '#6366f1', category: 'work'
-      },
-      {
-        id: nextId++, userId: 1, title: '午餐约会',
-        startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0).toISOString(),
-        endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 13, 0).toISOString(),
-        color: '#22c55e', category: 'personal'
-      },
-      {
-        id: nextId++, userId: 1, title: '项目评审',
-        startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 14, 0).toISOString(),
-        endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 16, 0).toISOString(),
-        color: '#f59e0b', category: 'work'
-      }
-    ]
-    events.value = mocks
-  }
-
   function checkConflicts(startTime: string, endTime: string, excludeId?: number): CalendarEvent[] {
-    const start = new Date(startTime).getTime()
-    const end = new Date(endTime).getTime()
+    // 解析 yyyy-MM-dd HH:mm:ss 格式
+    const parseTime = (t: string) => {
+      if (t.includes('T')) return new Date(t).getTime()
+      // yyyy-MM-dd HH:mm:ss -> 可以被 Date 正确解析
+      return new Date(t.replace(' ', 'T')).getTime()
+    }
+    const start = parseTime(startTime)
+    const end = parseTime(endTime)
     return events.value.filter(ev => {
       if (excludeId !== undefined && ev.id === excludeId) return false
-      const es = new Date(ev.startTime).getTime()
-      const ee = new Date(ev.endTime).getTime()
+      const es = parseTime(ev.startTime)
+      const ee = parseTime(ev.endTime)
       return start < ee && end > es
     })
+  }
+
+  // 启动自动刷新
+  function startAutoRefresh() {
+    if (refreshTimer) return
+    refreshTimer = setInterval(() => {
+      fetchEvents()
+    }, AUTO_REFRESH_INTERVAL)
+  }
+
+  // 停止自动刷新
+  function stopAutoRefresh() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
   }
 
   return {
@@ -142,6 +132,7 @@ export function useEvents() {
     updateEvent,
     deleteEvent,
     checkConflicts,
-    seedMockEvents
+    startAutoRefresh,
+    stopAutoRefresh
   }
 }

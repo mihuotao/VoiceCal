@@ -31,6 +31,7 @@ const emit = defineEmits<{
   editResult: []
   startRecord: []
   stopRecord: []
+  openForm: []
 }>()
 
 watch(() => props.open, async (v) => {
@@ -99,6 +100,7 @@ function handleClose() {
             @edit="emit('editResult')"
             @retry="emit('retry')"
             @close="handleClose"
+            @open-form="emit('openForm')"
           />
         </div>
 

@@ -8,6 +8,7 @@ import com.voicecal.model.dto.UpdateEventRequest;
 import com.voicecal.model.vo.CalendarViewVO;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface EventService {
@@ -29,5 +30,23 @@ public interface EventService {
     CalendarViewVO getCalendarView(Long userId, String view, LocalDate date);
 
     List<CalendarEvent> listByDateRange(Long userId, LocalDate start, LocalDate end);
+
+    /**
+     * 检测时间冲突
+     * @param userId 用户ID
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 冲突的事件列表
+     */
+    List<CalendarEvent> findConflicts(Long userId, LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
+     * 按标题和日期查询事件
+     * @param userId 用户ID
+     * @param title 事件标题（模糊匹配）
+     * @param date 事件日期
+     * @return 匹配的事件列表
+     */
+    List<CalendarEvent> findByTitleAndDate(Long userId, String title, LocalDate date);
 
 }

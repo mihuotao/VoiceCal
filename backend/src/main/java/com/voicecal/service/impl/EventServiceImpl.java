@@ -272,6 +272,45 @@ public class EventServiceImpl implements EventService {
                         .orderByAsc(CalendarEvent::getStartTime));
     }
 
+    @Override
+    public List<CalendarEvent> findConflicts(Long userId, LocalDateTime startTime, LocalDateTime endTime) {
+        return eventMapper.selectList(
+                new LambdaQueryWrapper<CalendarEvent>()
+                        .eq(CalendarEvent::getUserId, userId)
+                        .ne(CalendarEvent::getStatus, "cancelled")
+                        .and(w -> w
+                                // 新事件的开始时间在已有事件的时间范围内
+                                .and(inner -> inner
+                                        .le(CalendarEvent::getStartTime, startTime)
+                                        .ge(CalendarEvent::getEndTime, startTime))
+                                .or()
+                                // 新事件的结束时间在已有事件的时间范围内
+                                .and(inner -> inner
+                                        .le(CalendarEvent::getStartTime, endTime)
+                                        .ge(CalendarEvent::getEndTime, endTime))
+                                .or()
+                                // 新事件完全包含已有事件
+                                .and(inner -> inner
+                                        .ge(CalendarEvent::getStartTime, startTime)
+                                        .le(CalendarEvent::getEndTime, endTime))
+                        )
+                        .orderByAsc(CalendarEvent::getStartTime)
+        );
+    }
+
+    @Override
+    public List<CalendarEvent> findByTitleAndDate(Long userId, String title, LocalDate date) {
+        return eventMapper.selectList(
+                new LambdaQueryWrapper<CalendarEvent>()
+                        .eq(CalendarEvent::getUserId, userId)
+                        .like(CalendarEvent::getTitle, title)
+                        .ge(CalendarEvent::getStartTime, date.atStartOfDay())
+                        .le(CalendarEvent::getStartTime, date.atTime(23, 59, 59))
+                        .ne(CalendarEvent::getStatus, "cancelled")
+                        .orderByAsc(CalendarEvent::getStartTime)
+        );
+    }
+
     private EventVO toEventVO(CalendarEvent event) {
         EventVO vo = new EventVO();
         vo.setId(event.getId());

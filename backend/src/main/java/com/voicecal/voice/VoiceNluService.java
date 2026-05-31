@@ -32,10 +32,12 @@ public class VoiceNluService {
             "日程", "安排表", "行程"
     };
 
-    /** 创建意图关键词 — 排除"安排"（有歧义） */
+    /** 创建意图关键词 */
     private static final String[] CREATE_KEYWORDS = {
             "创建", "新建", "添加", "新增", "加一个", "加个",
-            "安排一个", "安排一下", "设一个"
+            "安排一个", "安排一下", "设一个",
+            "开会", "会议", "培训", "出差", "面试", "约会",
+            "聚餐", "聚会", "团建", "生日"
     };
 
     /** 独立日期关键词（用于 matchQuery 触发） */
@@ -85,9 +87,158 @@ public class VoiceNluService {
             return llmResult;
         }
 
-        // 第二步：LLM 失败/超时/低置信度 → 规则引擎兜底
-        log.info("NLU 降级到规则引擎 (LLM 结果: {})", llmResult != null ? llmResult.getConfidence() : "null");
+        // 第二步：LLM 失败/超时/低置信度 → 关键字匹配
+        NluResult keywordResult = parseWithKeywords(text);
+        if (keywordResult != null) {
+            log.info("NLU 结果来源: 关键字匹配, intent={}", keywordResult.getIntent());
+            return keywordResult;
+        }
+
+        // 第三步：关键字匹配失败 → 规则引擎兜底
+        log.info("NLU 降级到规则引擎");
         return parseWithRules(text);
+    }
+
+    /**
+     * 关键字优先匹配（最高优先级）
+     * 包含关键字直接返回对应意图，不调用 LLM
+     */
+    private NluResult parseWithKeywords(String text) {
+        // 创建关键字
+        if (containsAny(text, CREATE_KEYWORDS)) {
+            NluResult result = new NluResult(text, "CREATE", 0.95, "keyword");
+            extractCreateEntities(text, result);
+            return result;
+        }
+
+        // 查询关键字
+        if (containsAny(text, QUERY_INDICATORS)) {
+            NluResult result = new NluResult(text, "QUERY", 0.95, "keyword");
+            extractQueryEntities(text, result);
+            return result;
+        }
+
+        // 修改关键字
+        String[] UPDATE_KEYWORDS = {"修改", "更改", "编辑", "改一下"};
+        if (containsAny(text, UPDATE_KEYWORDS)) {
+            NluResult result = new NluResult(text, "UPDATE", 0.95, "keyword");
+            extractUpdateEntities(text, result);
+            return result;
+        }
+
+        // 删除关键字
+        String[] DELETE_KEYWORDS = {"删除", "取消", "移除", "去掉"};
+        if (containsAny(text, DELETE_KEYWORDS)) {
+            NluResult result = new NluResult(text, "DELETE", 0.95, "keyword");
+            extractDeleteEntities(text, result);
+            return result;
+        }
+
+        // 提醒关键字
+        String[] REMINDER_KEYWORDS = {"提醒", "记得", "别忘"};
+        if (containsAny(text, REMINDER_KEYWORDS)) {
+            NluResult result = new NluResult(text, "REMINDER", 0.95, "keyword");
+            extractReminderEntities(text, result);
+            return result;
+        }
+
+        // 没有匹配到关键字
+        return null;
+    }
+
+    /**
+     * 提取创建事件的实体
+     */
+    private void extractCreateEntities(String text, NluResult result) {
+        String title = extractTitle(text);
+        result.addEntity("title", title);
+
+        LocalDate date = extractDate(text);
+        if (date != null) result.addEntity("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE));
+
+        LocalTime startTime = extractTime(text);
+        if (startTime != null) result.addEntity("startTime", startTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+
+        LocalTime endTime = extractEndTime(text, startTime);
+        if (endTime != null) result.addEntity("endTime", endTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+
+        String category = extractCategory(text);
+        if (category != null) result.addEntity("category", category);
+
+        String location = extractLocation(text);
+        if (location != null) result.addEntity("location", location);
+
+        // 如果没有日期，默认明天
+        if (!result.getEntities().containsKey("date")) {
+            result.addEntity("date", LocalDate.now().plusDays(1).format(DateTimeFormatter.ISO_LOCAL_DATE));
+        }
+
+        // 如果没有开始时间，默认 09:00
+        if (!result.getEntities().containsKey("startTime")) {
+            result.addEntity("startTime", "09:00");
+        }
+
+        // 如果没有结束时间，默认开始时间 + 1 小时
+        if (!result.getEntities().containsKey("endTime")) {
+            String startStr = (String) result.getEntities().get("startTime");
+            LocalTime start = LocalTime.parse(startStr);
+            result.addEntity("endTime", start.plusHours(1).format(DateTimeFormatter.ofPattern("HH:mm")));
+        }
+    }
+
+    /**
+     * 提取查询事件的实体
+     */
+    private void extractQueryEntities(String text, NluResult result) {
+        LocalDate[] range = extractDateRange(text);
+        result.addEntity("startDate", range[0].format(DateTimeFormatter.ISO_LOCAL_DATE));
+        result.addEntity("endDate", range[1].format(DateTimeFormatter.ISO_LOCAL_DATE));
+
+        if (range[0].equals(range[1])) {
+            result.addEntity("date", range[0].format(DateTimeFormatter.ISO_LOCAL_DATE));
+        }
+
+        String category = extractCategory(text);
+        if (category != null) result.addEntity("category", category);
+    }
+
+    /**
+     * 提取修改事件的实体
+     */
+    private void extractUpdateEntities(String text, NluResult result) {
+        String title = extractTitle(text);
+        if (title != null) result.addEntity("title", title);
+
+        LocalDate date = extractDate(text);
+        if (date != null) result.addEntity("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE));
+
+        LocalTime newTime = extractTime(text);
+        if (newTime != null) result.addEntity("newStartTime", newTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+    }
+
+    /**
+     * 提取删除事件的实体
+     */
+    private void extractDeleteEntities(String text, NluResult result) {
+        String title = extractTitle(text);
+        if (title != null) result.addEntity("title", title);
+
+        LocalDate date = extractDate(text);
+        if (date != null) result.addEntity("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE));
+    }
+
+    /**
+     * 提取提醒事件的实体
+     */
+    private void extractReminderEntities(String text, NluResult result) {
+        String title = extractTitle(text);
+        result.addEntity("title", title != null ? title : "提醒事项");
+
+        LocalDate date = extractDate(text);
+        if (date != null) result.addEntity("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE));
+
+        LocalTime time = extractTime(text);
+        if (time != null) result.addEntity("time", time.format(DateTimeFormatter.ofPattern("HH:mm")));
     }
 
     /**
@@ -172,6 +323,9 @@ public class VoiceNluService {
 
         String category = extractCategory(text);
         if (category != null) result.addEntity("category", category);
+
+        String location = extractLocation(text);
+        if (location != null) result.addEntity("location", location);
 
         if (!result.getEntities().containsKey("date")) {
             result.setRequiresClarify(true);
@@ -708,6 +862,36 @@ public class VoiceNluService {
                 || text.contains("父母") || text.contains("孩子")) return "family";
         if (text.contains("个人") || text.contains("运动") || text.contains("健身")
                 || text.contains("看医生") || text.contains("看病")) return "personal";
+        return null;
+    }
+
+    // ==================== 地点提取 ====================
+
+    /**
+     * 从文本中提取地点信息
+     * 支持："在XXX"、"于XXX"、"到XXX"
+     */
+    private String extractLocation(String text) {
+        // 匹配 "在XXX" 模式
+        Pattern p1 = Pattern.compile("在([^，。,.\\s]+(?:室|厅|楼|馆|场|园|区|中心|会议室|办公室|咖啡厅|餐厅)?)");
+        Matcher m1 = p1.matcher(text);
+        if (m1.find()) {
+            String location = m1.group(1);
+            if (location.length() >= 2 && location.length() <= 20) {
+                return location;
+            }
+        }
+
+        // 匹配 "于XXX" 模式
+        Pattern p2 = Pattern.compile("于([^，。,.\\s]+(?:室|厅|楼|馆|场|园|区|中心|会议室|办公室)?)");
+        Matcher m2 = p2.matcher(text);
+        if (m2.find()) {
+            String location = m2.group(1);
+            if (location.length() >= 2 && location.length() <= 20) {
+                return location;
+            }
+        }
+
         return null;
     }
 

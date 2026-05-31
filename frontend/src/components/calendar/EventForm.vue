@@ -22,10 +22,20 @@ const props = withDefaults(defineProps<{
   event?: CalendarEvent | null
   initialDate?: string
   initialTitle?: string
+  initialStartTime?: string
+  initialEndTime?: string
+  initialLocation?: string
+  initialCategory?: string
+  initialAllDay?: boolean
 }>(), {
   open: false,
   initialDate: '',
-  initialTitle: ''
+  initialTitle: '',
+  initialStartTime: '',
+  initialEndTime: '',
+  initialLocation: '',
+  initialCategory: 'personal',
+  initialAllDay: false
 })
 
 const emit = defineEmits<{
@@ -132,12 +142,12 @@ watch(() => props.open, (opened) => {
     form.title = props.initialTitle || ''
     form.description = ''
     form.date = d
-    form.startTime = '09:00'
-    form.endTime = '10:00'
-    form.allDay = false
-    form.location = ''
+    form.startTime = props.initialStartTime || '09:00'
+    form.endTime = props.initialEndTime || '10:00'
+    form.allDay = props.initialAllDay || false
+    form.location = props.initialLocation || ''
     form.color = '#6366f1'
-    form.category = 'personal'
+    form.category = props.initialCategory || 'personal'
   }
 })
 
