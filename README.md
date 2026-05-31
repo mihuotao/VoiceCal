@@ -1,4 +1,4 @@
-<div align="center">
+<div 对齐="center">
 
 # 🎙️ VoiceCal 智能语音日历
 
@@ -12,9 +12,9 @@
 
 
 
-**登录账号：** `admin` / `12345678` &nbsp;·&nbsp; `test` / `12345678`
+**登录账号：admin/12345678
 
-</div>
+& lt;div>
 
 ---
 
@@ -22,7 +22,7 @@
 
 VoiceCal 是一个全栈智能语音日历系统，支持通过**中文语音命令**创建和管理日程，集成**百度实时流式语音识别 (ASR)** 与 **DeepSeek 大语言模型 NLU**，配合**星空玻璃拟态主题**提供沉浸式的日历管理体验。
 
-前端采用 Vue 3 + TypeScript + Vite 6，后端采用 Spring Boot 3 + MyBatis-Plus + MySQL 8，全 Docker 一键部署。
+前端采用 Vue 3   TypeScript   Vite 6，后端采用 Spring Boot 3   MyBatis-Plus   MySQL 8，全 Docker 一键部署。
 
 ---
 
